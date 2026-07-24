@@ -1,0 +1,585 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Refract lab — cross-browser feDisplacementMap gate</title>
+
+<!--
+  CHUNK 1 GATE. No build step, no framework, no bundler. Open directly in
+  Chrome, Safari and Firefox.
+
+  What it must prove, in all three engines:
+    1. `filter: url(#id)` + feDisplacementMap visibly bends the backdrop at the
+       rim and leaves the interior untouched.
+    2. Text on the glass stays crisp and selectable; a link on it stays clickable.
+    3. The cloned refraction source stays aligned while dragging, with NO map
+       regeneration (position lives in CSS vars only).
+    4. Displacement magnitude agrees across engines (probe readout below).
+
+  FINDING 001 (measured here, 2026-07-24): `filter` establishes a BACKDROP ROOT.
+  So `backdrop-filter` on the same element - or on any descendant of a filtered
+  element - has nothing behind it to sample and collapses to a flat tint. The
+  frost and the lens can therefore never share a node.
+  Consequence, and it is a simplification: because we refract a COPY we control,
+  the frost (blur) and the vibrancy (saturate) go INSIDE the SVG filter as
+  feGaussianBlur + feColorMatrix. `backdrop-filter` is not used at all on the
+  refract tier. One filter, one layer, three engines.
+-->
+
+<style>
+  :root {
+    color-scheme: dark;
+    --n-0:   oklch(99.2% .003 264);
+    --n-400: oklch(63.0% .010 264);
+    --n-900: oklch(17.5% .009 264);
+    --n-950: oklch(12.5% .006 264);
+    --ease:  cubic-bezier(.4, 0, .6, 1);
+
+    /* the material, Apple's shipped values as the anchor */
+    --rf-blur: 12px;
+    --rf-saturate: 1.8;      /* apple.com ships saturate(180%) */
+    --rf-tint: oklch(99.2% .003 264);
+    --rf-tint-opacity: .14;  /* low for the demo so the bend is visible;
+                                the `regular` preset ships .80 like Apple's nav */
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 24px 96px;
+    background: var(--n-950); color: var(--n-0);
+    font: 400 17px/1.3529 ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1 { font: 600 28px/1.1428 ui-sans-serif, system-ui, sans-serif; letter-spacing: -.01em; margin: 0 0 4px; }
+  .sub { color: var(--n-400); font-size: 14px; letter-spacing: .009em; margin: 0 0 28px; max-width: 860px; }
+
+  .stage { position: relative; width: 100%; max-width: 900px; height: 460px;
+           border-radius: 24px; overflow: hidden; margin-bottom: 20px; }
+
+  /* ONE definition of the backdrop, used by both the real layer and the clone.
+     Refraction is only visible as the displacement of an edge, so this
+     guarantees a dense set of hard edges plus large chroma steps. */
+  .backdrop {
+    position: absolute; inset: 0;
+    background:
+      repeating-linear-gradient(0deg, oklch(100% 0 0 / .85) 0 1px, transparent 1px 18px),
+      repeating-linear-gradient(90deg,
+        oklch(72% .19 292) 0 56px, oklch(68% .21 336) 56px 112px,
+        oklch(76% .17 214) 112px 168px, oklch(82% .15 152) 168px 224px,
+        oklch(64% .22 28)  224px 280px);
+  }
+  .headline {
+    position: absolute; left: 0; top: 0; padding: 26px 32px;
+    font: 600 34px/1.1 ui-sans-serif, system-ui, sans-serif; letter-spacing: -.016em;
+    color: oklch(14% .02 264); width: 900px;
+  }
+  .headline a { color: oklch(28% .16 264); }
+
+  /* ---- the glass surface ------------------------------------------------ */
+  /* .glass carries layout, radius, rim and shadow. It NEVER carries `filter`. */
+  .glass {
+    position: absolute; z-index: 2; left: 96px; top: 148px;
+    width: 380px; height: 208px;
+    border-radius: 28px;
+    cursor: grab; touch-action: none;
+    /* clips the inflated filter region's overspill back to the rounded rect.
+       Does not clip this element's own box-shadow, only descendants. */
+    overflow: hidden;
+    /* asymmetric gradient rim: a uniform 1px white border is the #1 tell */
+    border: 1px solid transparent;
+    background:
+      linear-gradient(oklch(from var(--rf-tint) l c h / var(--rf-tint-opacity)) 0 0) padding-box,
+      linear-gradient(145deg,
+        oklch(100% 0 0 / .55) 0%, oklch(100% 0 0 / .10) 38%,
+        oklch(100% 0 0 / .02) 55%, oklch(100% 0 0 / .22) 100%) border-box;
+    box-shadow:
+      inset 0  1px 0 0 oklch(100% 0 0 / .40),
+      inset 0 -1px 0 0 oklch(100% 0 0 / .10),
+      inset 0  0 24px 0 oklch(100% 0 0 / .06),
+      0  1px  2px -1px  oklch(24% .03 265 / .18),
+      0  4px  8px -2px  oklch(24% .03 265 / .16),
+      0 12px 24px -6px  oklch(24% .03 265 / .14),
+      0 32px 64px -16px oklch(24% .03 265 / .18);
+  }
+  .glass:active { cursor: grabbing; }
+
+  /* the refraction layer: the ONLY node with `filter`. Holds the cloned source. */
+  /* FINDING 007: do not try to fix the rim by inflating the FILTER REGION while
+     the source stays element-sized. Two things go wrong. Clipping the lens
+     (overflow/contain) starves the inflated region and the dark rim returns;
+     NOT clipping it makes Chromium and Firefox compute a different object
+     bounding box than WebKit (they appear to take overflowing descendants into
+     account), which rescales the map and silently kills the effect in 2 of 3
+     engines.
+     The engine-independent answer: make the FILTERED ELEMENT itself larger than
+     the visible surface by the displacement margin, keep the filter region at
+     the default 0/0/1/1, generate the map across that larger box with the lens
+     shape inset inside it, and clip the output on the parent. Now every engine
+     agrees on the bounding box, and the rim always has real pixels to sample. */
+  .lens {
+    position: absolute;
+    inset: -20%;               /* == INFLATE, kept in sync in JS */
+    overflow: hidden;          /* stable bounding box in every engine */
+    z-index: 0;
+    pointer-events: none;
+  }
+  /* the clone: same size as the stage, offset so it registers pixel-for-pixel
+     with the real backdrop. Position is CSS-var only, so dragging never
+     regenerates the map and never re-renders anything in JS. */
+  .clone {
+    position: absolute; left: 0; top: 0; width: 900px; height: 460px;
+    transform: translate3d(var(--rf-off-x, 0px), var(--rf-off-y, 0px), 0);
+    will-change: transform;
+  }
+
+  .content { position: relative; z-index: 1; padding: 20px 24px; }
+  .content h2 { font: 590 21px/1.2857 ui-sans-serif, system-ui, sans-serif;
+                letter-spacing: -.008em; margin: 0 0 8px;
+                text-shadow: 0 1px 2px oklch(0% 0 0 / .35); }
+  .content p  { margin: 0 0 10px; font-size: 15px; color: oklch(100% 0 0 / .88);
+                text-shadow: 0 1px 2px oklch(0% 0 0 / .35); }
+  .content a  { color: oklch(88% .10 258); position: relative; z-index: 2; }
+
+  /* B: the naive comparison. backdrop-filter only, no `filter`, so it is legal. */
+  .naive {
+    left: 500px;
+    background: oklch(100% 0 0 / .15);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid oklch(100% 0 0 / .30);
+    box-shadow: 0 8px 32px oklch(0% 0 0 / .37);
+  }
+
+  .row { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+  .panel { background: var(--n-900); border: 1px solid oklch(100% 0 0 / .10);
+           border-radius: 16px; padding: 16px 18px; min-width: 290px; }
+  .panel h3 { margin: 0 0 10px; font: 590 13px/1.35 ui-sans-serif, system-ui, sans-serif;
+              letter-spacing: .012em; text-transform: uppercase; color: var(--n-400); }
+  table { border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  td { padding: 2px 14px 2px 0; }
+  td:first-child { color: var(--n-400); }
+  .ok { color: oklch(78% .17 152); } .bad { color: oklch(68% .21 25); }
+  #map { image-rendering: pixelated; border-radius: 8px; border: 1px solid oklch(100% 0 0 / .12); }
+  label { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--n-400); margin-bottom: 6px; }
+  label input { flex: 1; }
+  label b { color: var(--n-0); min-width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
+</style>
+
+<h1>Refract lab: cross-browser refraction gate</h1>
+<p class="sub">Drag the left panel across the hairlines and the heading. The rim must bend them; the interior must not. The label text on the glass must stay crisp and selectable, and its link clickable.</p>
+
+<div class="stage" id="stage">
+  <div class="backdrop"></div>
+  <div class="headline">
+    Refraction bends what a blur only smears.
+    <a href="#under" id="underlink">A link under the glass.</a>
+  </div>
+
+  <div class="glass" id="glass">
+    <div class="lens" id="lens">
+      <!-- cloned refraction source: inert + aria-hidden so it never reaches the
+           a11y tree, the tab order, or hit testing -->
+      <div class="clone" id="clone" aria-hidden="true" inert></div>
+    </div>
+    <div class="content">
+      <h2>Refract</h2>
+      <p>The backdrop bends at the rim and stays neutral in the middle, so this label is readable.</p>
+      <a href="#inner" id="innerlink">Clickable link on the lens</a>
+    </div>
+  </div>
+
+  <div class="glass naive">
+    <div class="content">
+      <h2>Naive blur</h2>
+      <p>Same blur radius, uniform 1px border, one black shadow. Nothing bends.</p>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="panel"><h3>Self-report</h3><table id="report"></table></div>
+  <div class="panel">
+    <h3>Displacement map</h3>
+    <canvas id="map" width="256" height="256" style="width:172px;height:172px"></canvas>
+    <table id="probe" style="margin-top:10px"></table>
+  </div>
+  <div class="panel">
+    <h3>Material</h3>
+    <label>band   <input type="range" id="band"  min="4" max="90"  step="1"    value="30"><b id="bandv"></b></label>
+    <label>depth  <input type="range" id="depth" min="1" max="80"  step="1"    value="26"><b id="depthv"></b></label>
+    <label>curve  <input type="range" id="curve" min="1" max="8"   step="0.1"  value="3.2"><b id="curvev"></b></label>
+    <label>ior    <input type="range" id="ior"   min="1" max="2"   step="0.01" value="1.45"><b id="iorv"></b></label>
+    <label>chroma <input type="range" id="chr"   min="0" max="1"   step="0.01" value="0.5"><b id="chrv"></b></label>
+    <label>spec   <input type="range" id="spec"  min="0" max="1"   step="0.01" value="0.5"><b id="specv"></b></label>
+    <label>angle  <input type="range" id="ang"   min="0" max="360" step="1"    value="135"><b id="angv"></b></label>
+    <label>blur   <input type="range" id="blur"  min="0" max="30"  step="0.5"  value="10"><b id="blurv"></b></label>
+  </div>
+</div>
+
+<!-- FINDING 003: WebKit will not resolve a filter defined inside an <svg> of zero
+     size (and drops it entirely for display:none). The container must be laid
+     out and non-empty. 1x1 + overflow:hidden keeps it invisible without hiding
+     it from the engine. -->
+<svg id="defs" width="1" height="1"
+     style="position:absolute;width:1px;height:1px;overflow:hidden;pointer-events:none;opacity:0.01"
+     aria-hidden="true"></svg>
+
+<script>
+const SVG = 'http://www.w3.org/2000/svg';
+const XLINK = 'http://www.w3.org/1999/xlink';
+
+// ---------------------------------------------------------------------------
+// 1. Geometry. Exact SDF for a rounded rect plus its ANALYTIC gradient.
+//    |grad(sd)| == 1 for a true SDF, so the normal is exact: no finite
+//    differences, no Sobel pass, no sampling noise, no artifact-masking blur.
+// ---------------------------------------------------------------------------
+function sdRoundedRect(x, y, hw, hh, r) {
+  const qx = Math.abs(x) - hw + r, qy = Math.abs(y) - hh + r;
+  return Math.min(Math.max(qx, qy), 0) + Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) - r;
+}
+function gradRoundedRect(x, y, hw, hh, r) {
+  const sx = Math.sign(x) || 1, sy = Math.sign(y) || 1;
+  const qx = Math.abs(x) - hw + r, qy = Math.abs(y) - hh + r;
+  if (qx > 0 && qy > 0) { const L = Math.hypot(qx, qy) || 1; return [sx * qx / L, sy * qy / L]; }
+  return qx > qy ? [sx, 0] : [0, sy];
+}
+
+// ---------------------------------------------------------------------------
+// 2. Height field: a slab with a bevelled rim. h rises from 0 at the silhouette
+//    to `depth` at the inner edge of the band, with slope -> 0 there.
+//    h'(interior) == 0, so INTERIOR NEUTRALITY IS ANALYTIC, not clamped in.
+//    That is why text in the middle of the lens stays pixel-exact.
+// ---------------------------------------------------------------------------
+const bevelSlope = (u, c) => c * Math.pow(1 - u, c - 1);
+
+// Thin-slab Snell refraction. I = (0,0,-1), looking into the screen.
+function refractOffset(hx, hy, depth, ior) {
+  const nl = Math.hypot(hx, hy, 1);
+  const N = [-hx / nl, -hy / nl, 1 / nl];
+  const eta = 1 / ior;
+  const cosi = N[2];                                   // -dot(N, I), I = (0,0,-1)
+  const k = 1 - eta * eta * (1 - cosi * cosi);
+  if (k < 0) return [0, 0];                            // total internal reflection
+  const f = eta * cosi - Math.sqrt(k);
+  const T = [f * N[0], f * N[1], -eta + f * N[2]];
+  if (T[2] >= -1e-6) return [0, 0];
+  const t = depth / -T[2];                             // march to the back face
+  return [T[0] * t, T[1] * t];
+}
+
+// ---------------------------------------------------------------------------
+// 3. Map generation, quarter symmetry (4x cheaper).
+//    R = x displacement, G = y displacement, B = specular, A = 255 ALWAYS.
+//    Any A < 255 round-trips through premultiplied alpha in some engines and
+//    corrupts the 127/128 neutral, which shows up as a seam.
+//    Neutral is 127.5 -> 127 on rounding, matching a decode of the reference
+//    production map (centre reads 127,127,128).
+// ---------------------------------------------------------------------------
+// INFLATE ties the map's extent to the filter region's extent. They must match
+// exactly: because WebKit forbids a feImage subregion (FINDING 005), the map
+// always stretches across the WHOLE filter region, so if the region is inflated
+// past the element box the map must cover the same inflated extent or the bend
+// ring lands outside the element and the effect silently vanishes.
+const INFLATE = 0.2;
+
+function generateMap(res, W, H, radius, m) {
+  const data = new Uint8ClampedArray(res * res * 4);
+  const hw = W / 2, hh = H / 2, half = res >> 1;
+  // the raster spans the inflated region; the lens rect stays element-sized and
+  // centred, so everything outside it is left neutral
+  const spanW = W * (1 + 2 * INFLATE), spanH = H * (1 + 2 * INFLATE);
+  const a = m.angle * Math.PI / 180;
+  let L = [Math.cos(a), Math.sin(a), 0.35];
+  const Ll = Math.hypot(...L); L = L.map(v => v / Ll);
+
+  const ox = new Float32Array(half * half);
+  const oy = new Float32Array(half * half);
+  const sp = new Float32Array(half * half);
+  let maxAbs = 1e-6;
+
+  for (let j = 0; j < half; j++) {
+    const y = ((j + 0.5) / res) * spanH - spanH / 2;
+    for (let i = 0; i < half; i++) {
+      const x = ((i + 0.5) / res) * spanW - spanW / 2;
+      const sd = sdRoundedRect(x, y, hw, hh, radius);
+      if (sd >= 0) continue;                             // outside: stays neutral
+      const k = j * half + i;
+      const u = Math.min(-sd / m.band, 1);
+      const g = gradRoundedRect(x, y, hw, hh, radius);    // outward unit normal
+      // grad(h) = h'(u) * grad(u),  grad(u) = -grad(sd) / band
+      const s = m.depth * bevelSlope(u, m.curve) / m.band;
+      const hx = s * -g[0], hy = s * -g[1];
+      const [dx, dy] = refractOffset(hx, hy, m.depth, m.ior);
+      ox[k] = dx; oy[k] = dy;
+      if (Math.abs(dx) > maxAbs) maxAbs = Math.abs(dx);
+      if (Math.abs(dy) > maxAbs) maxAbs = Math.abs(dy);
+      const nl = Math.hypot(hx, hy, 1);
+      sp[k] = Math.pow(Math.max((-hx / nl) * L[0] + (-hy / nl) * L[1] + (1 / nl) * L[2], 0), 18);
+    }
+  }
+
+  // scale is DERIVED so that channel 255 == maxAbs displacement. Hard-coding
+  // `scale` and letting the map clip is why most implementations look mushy.
+  const scalePx = 2 * maxAbs;
+  const put = (i, j, r, g, b) => {
+    const o = (j * res + i) * 4;
+    data[o] = r; data[o + 1] = g; data[o + 2] = b; data[o + 3] = 255;
+  };
+  for (let j = 0; j < half; j++) for (let i = 0; i < half; i++) {
+    const k = j * half + i;
+    const R = 127.5 + 255 * (ox[k] / scalePx);
+    const G = 127.5 + 255 * (oy[k] / scalePx);
+    const B = 128 + 127 * sp[k] * m.spec;
+    const i2 = res - 1 - i, j2 = res - 1 - j;
+    put(i,  j,  R,       G,       B);   // mirror negates X across the vertical
+    put(i2, j,  255 - R, G,       B);   // axis and Y across the horizontal
+    put(i,  j2, R,       255 - G, B);
+    put(i2, j2, 255 - R, 255 - G, B);
+  }
+  return { data, res, scalePx };
+}
+
+// ---------------------------------------------------------------------------
+// 4. The filter graph. Frost + vibrancy + refraction + dispersion + specular,
+//    all in ONE filter on the cloned source. No backdrop-filter (see FINDING 001).
+//
+//    Three deliberate departures from the reference implementation:
+//      primitiveUnits=userSpaceOnUse  - fxtf-drafts#596: relative displacement
+//        on non-square inputs renders differently in EVERY engine. px units are
+//        the only cross-engine-deterministic choice, and parity is the product.
+//      isotropic px pre-blur          - analytic gradients need no anisotropic
+//        artifact masking.
+//      versioned filter id            - Safari caches filter output BY ID.
+// ---------------------------------------------------------------------------
+let version = 0;
+
+function buildFilter(mapUrl, W, H, scalePx, m) {
+  const id = `rf-lens-v${++version}`;
+  const s = [scalePx * (1 + m.chroma * 0.04), scalePx, scalePx * (1 - m.chroma * 0.04)];
+  const iso = ['1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0',
+               '0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0',
+               '0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0'];
+  const f = document.createElementNS(SVG, 'filter');
+  // FINDING 006: rim displacement samples OUTSIDE the surface, so if the source
+  // ends exactly at the visible edge the sample returns transparent black and
+  // paints a dark 1-2px fringe around the whole panel - one of the classic
+  // "cheap glass" tells, and an artifact rather than a design choice.
+  // The margin is provided by making the filtered element bigger (see the .lens
+  // rule and FINDING 007), NOT by inflating the region, so the region stays at
+  // its default and every engine agrees on it.
+  for (const [k, v] of Object.entries({
+    id, filterUnits: 'objectBoundingBox', primitiveUnits: 'userSpaceOnUse',
+    'color-interpolation-filters': 'sRGB',   // linearRGB shifts the 128 neutral
+    x: 0, y: 0, width: 1, height: 1,
+  })) f.setAttribute(k, v);
+
+  const add = (tag, attrs) => {
+    const n = document.createElementNS(SVG, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    f.appendChild(n); return n;
+  };
+
+  // The map.
+  //
+  // NEVER a fragment reference: Firefox's feImage does not support document
+  // fragments, only raster URLs. A `href="#el"` here is a Firefox-breaking bug.
+  // Also always a `data:` URI, never `blob:` — blob-backed images take a
+  // different decode path in Gecko.
+  //
+  // FINDING 005 (measured, primitive ladder): WebKit renders feImage correctly
+  // with NO subregion, but renders NOTHING when given an explicit
+  // x/y/width/height subregion. Everything downstream of it then goes empty,
+  // which is why the whole lens vanished in WebKit while Chromium was fine.
+  // So: no subregion. The map raster is element-sized by construction and
+  // preserveAspectRatio="none" stretches it across the filter region. The lens
+  // shape is baked into the map, which is where it belonged anyway.
+  const im = add('feImage', { result: 'map', preserveAspectRatio: 'none' });
+  im.setAttributeNS(XLINK, 'xlink:href', mapUrl);
+  im.setAttribute('href', mapUrl);
+
+  // frost + vibrancy, on the copy we own
+  add('feColorMatrix', { in: 'SourceGraphic', type: 'saturate', values: m.saturate, result: 'sat' });
+  add('feGaussianBlur', { in: 'sat', stdDeviation: Math.max(m.blur, 0.3), result: 'src' });
+
+  // three passes at spread scales == chromatic dispersion
+  for (let c = 0; c < 3; c++) {
+    add('feDisplacementMap', { in: 'src', in2: 'map', scale: s[c],
+      xChannelSelector: 'R', yChannelSelector: 'G', result: `d${c}` });
+    add('feColorMatrix', { in: `d${c}`, type: 'matrix', values: iso[c], result: `c${c}` });
+  }
+  const arith = { operator: 'arithmetic', k1: 0, k2: 1, k3: 1, k4: 0 };
+  add('feComposite', { in: 'c0', in2: 'c1', ...arith, result: 'rg' });
+  add('feComposite', { in: 'rg', in2: 'c2', ...arith, result: 'lens' });
+
+  if (m.spec > 0) {
+    // the specular highlight is encoded in the map's BLUE channel; only values
+    // above 128 contribute (alpha = B - 0.502)
+    add('feColorMatrix', { in: 'map', type: 'matrix', result: 'sp',
+      values: '0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 1 0 -0.50196' });
+    add('feComposite', { in: 'sp', in2: 'lens', ...arith });
+  }
+  return { node: f, id };
+}
+
+// ---------------------------------------------------------------------------
+// 5. Wire it up
+// ---------------------------------------------------------------------------
+const stage = document.getElementById('stage');
+const glass = document.getElementById('glass');
+const clone = document.getElementById('clone');
+const defs  = document.getElementById('defs');
+const mapCv = document.getElementById('map');
+const RES = 256;
+let lastMap = null, lastKey = '', genMs = 0;
+
+// build the clone's contents once, from the same markup as the real backdrop
+clone.innerHTML = document.querySelector('.backdrop').outerHTML +
+                  document.querySelector('.headline').outerHTML;
+
+const CTRLS = { band:'bandv', depth:'depthv', curve:'curvev', ior:'iorv',
+                chr:'chrv', spec:'specv', ang:'angv', blur:'blurv' };
+const v = id => parseFloat(document.getElementById(id).value);
+const material = () => ({
+  band: v('band'), depth: v('depth'), curve: v('curve'), ior: v('ior'),
+  chroma: v('chr'), spec: v('spec'), angle: v('ang'), blur: v('blur'),
+  saturate: 1.8,
+});
+
+// Position is CSS-var only. Dragging must never touch the map.
+//
+// FINDING 002: `.lens` is absolutely positioned with inset:0, which resolves
+// against the PADDING box, so it sits inset by the rim's border-width. Offsetting
+// the clone by -offsetLeft/-offsetTop therefore misregisters it by exactly the
+// border width (measured: 1px). Sub-pixel-looking, but it is a real seam at the
+// rim where displacement is strongest. Compensate with the border width, read
+// once, rather than with a per-frame getBoundingClientRect.
+const border = {
+  x: parseFloat(getComputedStyle(glass).borderLeftWidth) || 0,
+  y: parseFloat(getComputedStyle(glass).borderTopWidth) || 0,
+};
+function syncOffset() {
+  // lens.offsetLeft is negative (inset: -20%), measured from the glass padding
+  // edge, so this lands the clone's origin exactly on the stage's origin
+  clone.style.setProperty('--rf-off-x', `${-(glass.offsetLeft + border.x + lens.offsetLeft)}px`);
+  clone.style.setProperty('--rf-off-y', `${-(glass.offsetTop + border.y + lens.offsetTop)}px`);
+}
+
+function rebuild() {
+  // the lens covers the glass PADDING box (the rim sits on top of it), and the
+  // filtered element is that box grown by INFLATE on every side
+  const W = glass.clientWidth, H = glass.clientHeight;
+  const radius = Math.max(0, (parseFloat(getComputedStyle(glass).borderTopLeftRadius) || 28) - border.x);
+  const m = material();
+
+  // cache key excludes position entirely: regenerate on SHAPE change only
+  const key = JSON.stringify([W, H, radius, m.band, m.depth, m.curve, m.ior, m.spec, m.angle]);
+  if (key !== lastKey) {
+    const t0 = performance.now();
+    lastMap = generateMap(RES, W, H, radius, m);
+    genMs = performance.now() - t0;
+    lastKey = key;
+    mapCv.width = mapCv.height = RES;
+    mapCv.getContext('2d').putImageData(new ImageData(lastMap.data, RES, RES), 0, 0);
+    lastMap.url = mapCv.toDataURL('image/png');
+  }
+
+  const { node, id } = buildFilter(lastMap.url, W, H, lastMap.scalePx, m);
+  defs.replaceChildren(node);
+  document.getElementById('lens').style.filter = `url(#${id})`;
+
+  for (const k in CTRLS) document.getElementById(CTRLS[k]).textContent = document.getElementById(k).value;
+  syncOffset();
+  report(W, H, m);
+}
+
+const px = (i, j) => { const o = (j * RES + i) * 4, d = lastMap.data;
+                       return [d[o], d[o+1], d[o+2], d[o+3]]; };
+
+// Probe in LENS-relative coordinates, not raster coordinates. The raster spans
+// the inflated filter region, so raster fraction 0 is the outer margin, and the
+// lens edge sits at INFLATE/(1+2*INFLATE) of the raster.
+const lensToRaster = f => (INFLATE + f) / (1 + 2 * INFLATE);
+const pl = (fx, fy) => px(
+  Math.min(RES - 1, Math.max(0, Math.round(lensToRaster(fx) * RES))),
+  Math.min(RES - 1, Math.max(0, Math.round(lensToRaster(fy) * RES))),
+);
+const EDGE = 0.006;   // a hair inside the silhouette
+
+function report(W, H, m) {
+  const lens = document.getElementById('lens');
+  const cs = getComputedStyle(lens);
+  const nPasses = document.querySelectorAll('#defs feDisplacementMap').length;
+  const structural = CSS.supports('filter', 'url(#x)') &&
+    document.createElementNS(SVG, 'feDisplacementMap') instanceof SVGFEDisplacementMapElement;
+  let allA = true;
+  for (let k = 3; k < lastMap.data.length; k += 4) if (lastMap.data[k] !== 255) { allA = false; break; }
+
+  const engine = navigator.userAgent.includes('Firefox') ? 'Firefox'
+               : navigator.userAgent.includes('Chrome')  ? 'Chromium' : 'WebKit';
+  const rows = [
+    ['engine',             engine],
+    ['filter applied',     cs.filter && cs.filter !== 'none' ? 'yes' : 'NO'],
+    ['feDisplacementMap',  nPasses === 3 ? '3 passes' : `MISSING (${nPasses})`],
+    ['structural support', structural ? 'yes' : 'NO'],
+    ['backdrop url()',     CSS.supports('backdrop-filter', 'url(#x)') ? 'yes (Chromium)' : 'no'],
+    ['contrast-color()',   CSS.supports('color', 'contrast-color(red)') ? 'yes' : 'no'],
+    ['corner-shape',       CSS.supports('corner-shape', 'squircle') ? 'yes' : 'no'],
+    ['inert',              'inert' in HTMLElement.prototype ? 'yes' : 'no'],
+    ['surface',            `${W}x${H}`],
+    ['scale (derived)',    lastMap.scalePx.toFixed(3) + ' px'],
+    ['map gen',            genMs.toFixed(2) + ' ms'],
+    ['map data URI',       (lastMap.url.length / 1024).toFixed(1) + ' KB'],
+    ['alpha all 255',      allA ? 'yes' : 'NO'],
+    ['filter id',          'v' + version],
+  ];
+  document.getElementById('report').innerHTML = rows.map(([k, val]) => {
+    const bad = String(val).startsWith('NO') || String(val).startsWith('MISSING');
+    return `<tr><td>${k}</td><td class="${bad ? 'bad' : 'ok'}">${val}</td></tr>`;
+  }).join('');
+
+  document.getElementById('probe').innerHTML = [
+    ['centre', pl(.5, .5)], ['left edge', pl(EDGE, .5)], ['right edge', pl(1 - EDGE, .5)],
+    ['top edge', pl(.5, EDGE)], ['bottom', pl(.5, 1 - EDGE)],
+    ['15% inset', pl(.15, .5)], ['30% inset', pl(.30, .5)],
+    ['outside', px(2, 2)],
+  ].map(([k, val]) => `<tr><td>${k}</td><td>${val.join(',')}</td></tr>`).join('');
+}
+
+for (const k in CTRLS) document.getElementById(k).addEventListener('input', rebuild);
+
+// drag: only the filter region and the clone transform move. No map regen.
+// FINDING 004: a pointer drag handler on the glass surface HIJACKS TEXT
+// SELECTION. Pressing on a label and moving drags the panel instead of
+// selecting, which silently destroys the "text through glass is selectable"
+// property that is the whole reason to displace a clone. Any real component
+// must therefore drag from a handle or from non-text regions only.
+let drag = null;
+glass.addEventListener('pointerdown', e => {
+  if (e.target.closest('.content')) return;   // text and links keep their default behaviour
+  drag = { x: e.clientX - glass.offsetLeft, y: e.clientY - glass.offsetTop };
+  glass.setPointerCapture(e.pointerId);
+});
+glass.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const r = stage.getBoundingClientRect();
+  glass.style.left = Math.max(-40, Math.min(r.width  - glass.offsetWidth  + 40, e.clientX - drag.x)) + 'px';
+  glass.style.top  = Math.max(-40, Math.min(r.height - glass.offsetHeight + 40, e.clientY - drag.y)) + 'px';
+  syncOffset();
+});
+glass.addEventListener('pointerup', () => { drag = null; });
+
+for (const [id, flag] of [['innerlink', '__innerLinkClicked'], ['underlink', '__underLinkClicked']]) {
+  document.getElementById(id).addEventListener('click', e => {
+    e.preventDefault(); window[flag] = true; e.target.textContent = id + ' CLICKED';
+  });
+}
+
+window.__refract = {
+  rebuild,
+  moveTo: (x, y) => { glass.style.left = x + 'px'; glass.style.top = y + 'px'; syncOffset(); },
+  probe: () => ({
+    centre: pl(.5, .5), left: pl(EDGE, .5), right: pl(1 - EDGE, .5), top: pl(.5, EDGE),
+    inset15: pl(.15, .5), inset30: pl(.30, .5),
+    corner: px(2, 2),                       // the inflated margin: must stay neutral
+    scalePx: lastMap.scalePx, genMs,
+  }),
+};
+
+rebuild();
+</script>

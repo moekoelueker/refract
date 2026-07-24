@@ -1,0 +1,12 @@
+{
+  "name": "@refract/e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "gate": "playwright test",
+    "gate:update": "playwright test --update-snapshots"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  }
+}

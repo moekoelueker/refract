@@ -1,0 +1,105 @@
+<meta charset="utf-8">
+<title>Refract lab — displacement scale calibration</title>
+
+<!--
+  Measures, in PIXELS, how far each engine actually displaces content for a
+  known map value and a known `scale`. This is the decisive test behind the
+  product claim, because "it renders in all three engines" is worthless if the
+  three engines disagree about magnitude.
+
+  Method: a single hard black/white edge at a known x, displaced by a UNIFORM
+  map (constant R, G = neutral). feDisplacementMap samples from
+  (x + scale*(R/255 - 0.5)), so the edge must move by exactly that many px.
+  The harness finds the 50% luminance crossing to sub-pixel precision and
+  compares it to the analytic expectation.
+
+  ?units=user  -> primitiveUnits="userSpaceOnUse"      (what Refract ships)
+  ?units=obb   -> primitiveUnits="objectBoundingBox"   (what the reference impl
+                  and most demos use; w3c/fxtf-drafts#596 says this is NOT
+                  interoperable on non-square inputs, and this page proves it)
+-->
+
+<style>
+  html, body { margin: 0; background: #808080; }
+  #surface {
+    position: relative; width: 480px; height: 120px; overflow: hidden;
+    /* a single hard edge at exactly x = 240 */
+    background: linear-gradient(90deg, #000 0 240px, #fff 240px 480px);
+  }
+  #meta { font: 12px/1.5 ui-monospace, monospace; color: #fff; padding: 8px;
+          background: #111; white-space: pre; }
+</style>
+
+<div id="surface"></div>
+<div id="meta"></div>
+<svg id="defs" width="0" height="0" style="position:absolute" aria-hidden="true"></svg>
+
+<script>
+const SVG = 'http://www.w3.org/2000/svg';
+const XLINK = 'http://www.w3.org/1999/xlink';
+const q = new URLSearchParams(location.search);
+
+const W = 480, H = 120;
+const EDGE_X = 240;
+const MAP_R = +(q.get('r') ?? 192);      // uniform displacement channel value
+const SCALE = +(q.get('scale') ?? 40);   // feDisplacementMap scale
+const UNITS = q.get('units') === 'obb' ? 'objectBoundingBox' : 'userSpaceOnUse';
+
+// a uniform map: R = MAP_R, G = 128 (no vertical displacement), A = 255
+function uniformMap(res = 64) {
+  const c = document.createElement('canvas');
+  c.width = c.height = res;
+  const ctx = c.getContext('2d');
+  const d = new Uint8ClampedArray(res * res * 4);
+  for (let i = 0; i < res * res; i++) {
+    d[i * 4] = MAP_R; d[i * 4 + 1] = 128; d[i * 4 + 2] = 128; d[i * 4 + 3] = 255;
+  }
+  ctx.putImageData(new ImageData(d, res, res), 0, 0);
+  return c.toDataURL('image/png');
+}
+
+const f = document.createElementNS(SVG, 'filter');
+for (const [k, v] of Object.entries({
+  id: 'cal', filterUnits: 'objectBoundingBox', primitiveUnits: UNITS,
+  'color-interpolation-filters': 'sRGB', x: 0, y: 0, width: 1, height: 1,
+})) f.setAttribute(k, v);
+
+const add = (tag, attrs) => {
+  const n = document.createElementNS(SVG, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  f.appendChild(n); return n;
+};
+
+// No subregion on feImage: WebKit renders nothing when one is present (see
+// FINDING 005). The map fills the filter region and stretches to it.
+const isObb = UNITS === 'objectBoundingBox';
+const im = add('feImage', { result: 'map', preserveAspectRatio: 'none' });
+const url = uniformMap();
+im.setAttributeNS(XLINK, 'xlink:href', url);
+im.setAttribute('href', url);
+
+add('feDisplacementMap', {
+  in: 'SourceGraphic', in2: 'map',
+  scale: isObb ? SCALE / W : SCALE,     // fraction of the box vs px
+  xChannelSelector: 'R', yChannelSelector: 'G',
+});
+
+document.getElementById('defs').appendChild(f);
+document.getElementById('surface').style.filter = 'url(#cal)';
+
+// content is sampled from (x + d), so the edge APPEARS to move by -d
+const expectedShift = -SCALE * (MAP_R / 255 - 0.5);
+const expectedEdge = EDGE_X + expectedShift;
+
+document.getElementById('meta').textContent =
+  `units=${UNITS}  r=${MAP_R}  scale=${SCALE}\n` +
+  `expected shift = -scale*(r/255-0.5) = ${expectedShift.toFixed(3)} px\n` +
+  `expected edge x = ${expectedEdge.toFixed(3)}`;
+
+window.__cal = {
+  W, H, EDGE_X, MAP_R, SCALE, UNITS,
+  expectedShift, expectedEdge,
+  engine: navigator.userAgent.includes('Firefox') ? 'firefox'
+        : navigator.userAgent.includes('Chrome')  ? 'chromium' : 'webkit',
+};
+</script>
