@@ -320,3 +320,28 @@ the catch stored `null`, and the surface fell back to a bare CSS tint that looke
 plausible enough to pass a glance. The rim-delta test caught it (0.000 where it
 should be ~15), which is a good argument for asserting the *effect* numerically
 rather than eyeballing a screenshot.
+
+### FINDING 014 — ES modules make a page unopenable from disk, and it fails silently
+
+The bake-off pages were blank black when opened directly. Cause: over `file://`
+the origin is `null`, so `<script type="module">` imports are blocked by CORS
+(`net::ERR_FAILED`). The module never ran, `#app` stayed empty, and the page's own
+background made the failure look like a design rather than an error.
+
+Measured: over `http://` the same page produced 1.36 MB of DOM and mounted
+cleanly; over `file://`, zero.
+
+Two fixes, and the second matters more than the first:
+
+1. `scripts/bundle-bakeoff.mjs` concatenates the ES modules into one classic
+   script, so the review pages work by double-clicking. The library source stays
+   as ES modules; the bundle is a review artifact, kept honest by
+   `npm run verify:bundle`, which regenerates it and fails on any diff.
+2. **Every page now boots with a visible notice that the script replaces.** If the
+   script does not run, the notice stays and prints the reason. A blank screen is
+   never an acceptable failure mode for a review harness, because it is
+   indistinguishable from a rendering bug in the thing being reviewed — which is
+   exactly how this presented.
+
+Verified afterwards: 5 pages x 3 engines x {file://, http://} = 30/30 mount with
+8 glass surfaces each.

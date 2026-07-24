@@ -326,3 +326,18 @@ a { color: inherit; }
   .panel { flex: 1 1 auto; width: 100%; }
   .stage-wrap { overflow-x: auto; width: 100%; }
 }
+
+/* ── boot notice ──────────────────────────────────────────────────────────────
+   Visible before the page script runs and replaced on mount. Its whole purpose
+   is that a script failure can never present as a blank black screen again. */
+.boot { max-width: 720px; margin: 0 auto; padding: 96px 32px; }
+.boot h1 { margin: 0 0 12px; font: var(--rf-t-title); letter-spacing: var(--rf-tracking-title); }
+.boot p { margin: 0 0 12px; font: var(--rf-t-body); color: var(--rf-n-300); }
+.boot pre {
+  margin: 0 0 16px; padding: 14px 16px; overflow-x: auto;
+  border: 1px solid oklch(60% .18 28 / .4); border-radius: var(--rf-r-6);
+  background: oklch(30% .09 28 / .22); color: oklch(88% .10 28);
+  font: 400 13px/1.6 var(--rf-font-mono); white-space: pre-wrap;
+}
+.boot-hint { font: var(--rf-t-caption) !important; color: var(--rf-n-500) !important; }
+.boot-hint a { color: var(--rf-accent); }

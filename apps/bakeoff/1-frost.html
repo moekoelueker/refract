@@ -7,10 +7,44 @@
 <link rel="stylesheet" href="../../packages/core/approaches.css">
 <link rel="stylesheet" href="./lib/site.css">
 <body>
-<div id="app"></div>
-<script type="module">
-  import { mountPage } from './lib/page.js';
-  mountPage({ approach: 'frost' });
+
+<!-- The boot notice is replaced the moment the page mounts. If you can still see
+     it, something failed, and the reason is printed below rather than leaving you
+     with a blank screen. -->
+<div id="app"><div class="boot">
+  <h1>Refract bake-off</h1>
+  <p id="boot-msg">Loading the frost engine&hellip;</p>
+  <pre id="boot-err" hidden></pre>
+  <p class="boot-hint">If this notice does not disappear, the page script did not run.
+     Open <a href="./index.html">the scorecard</a> or see the README for how to serve the folder.</p>
+</div></div>
+
+<!-- A classic script, not an ES module, so these pages also work when opened
+     straight off disk with file://, where module imports are blocked by CORS.
+     Regenerate with: npm run bundle -->
+<script src="./lib/bundle.js"></script>
+<script>
+  (function () {
+    var msg = document.getElementById('boot-msg');
+    var err = document.getElementById('boot-err');
+    function fail(what) {
+      if (!msg) return;
+      msg.textContent = 'This page could not start.';
+      err.hidden = false;
+      err.textContent = what;
+    }
+    window.addEventListener('error', function (e) {
+      fail((e.message || 'script error') + (e.filename ? '\n' + e.filename + ':' + e.lineno : ''));
+    });
+    if (typeof window.mountPage !== 'function') {
+      fail('lib/bundle.js did not load or did not finish.\n' +
+           'Location: ' + location.href + '\n' +
+           'Run "npm run bundle" if lib/bundle.js is missing.');
+      return;
+    }
+    try { window.mountPage({ approach: 'frost' }); }
+    catch (e) { fail(String(e && e.stack || e)); }
+  })();
 </script>
 </body>
 </html>

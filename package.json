@@ -6,6 +6,9 @@
     "gate": "cd apps/e2e && playwright test gate",
     "gate:ladder": "cd apps/e2e && playwright test webkit-diagnose",
     "setup:browsers": "playwright install chromium firefox webkit",
-    "lab": "python3 -m http.server 4599 --directory apps/lab"
+    "lab": "python3 -m http.server 4599 --directory apps/lab",
+    "bundle": "node scripts/bundle-bakeoff.mjs",
+    "verify:bundle": "node scripts/bundle-bakeoff.mjs && git diff --exit-code -- apps/bakeoff/lib/bundle.js",
+    "bakeoff": "python3 -m http.server 4610"
   }
 }
