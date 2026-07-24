@@ -1,0 +1,328 @@
+/* ===========================================================================
+   Harness chrome. Deliberately quiet: near-achromatic, one accent, generous
+   whitespace, no decoration that competes with the glass being judged.
+   =========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  color-scheme: dark;
+  /* Safari 26+ derives browser chrome tint from the page's own CSS, so set this
+     explicitly rather than relying on theme-color. */
+  background: #08080a;
+}
+
+body {
+  margin: 0;
+  background: #08080a;
+  color: var(--rf-n-0);
+  font: var(--rf-t-body);
+  letter-spacing: var(--rf-tracking-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a { color: inherit; }
+
+/* ── head ─────────────────────────────────────────────────────────────────── */
+.shell-head {
+  display: flex; align-items: center; gap: 28px; flex-wrap: wrap;
+  padding: 20px 32px;
+  border-bottom: 1px solid oklch(100% 0 0 / .07);
+  position: sticky; top: 0; z-index: 50;
+  background: oklch(12.5% .006 264 / .82);
+  backdrop-filter: saturate(160%) blur(14px);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+}
+.shell-back {
+  font: var(--rf-t-caption); letter-spacing: var(--rf-tracking-small);
+  text-transform: uppercase; color: var(--rf-n-400); text-decoration: none;
+}
+.shell-back:hover { color: var(--rf-n-0); }
+.shell-nav { display: flex; gap: 4px; flex-wrap: wrap; }
+.shell-nav a {
+  display: flex; align-items: baseline; gap: 7px;
+  padding: 7px 13px; border-radius: var(--rf-r-4);
+  font: var(--rf-t-caption); text-decoration: none; color: var(--rf-n-300);
+  transition: background var(--rf-dur-fast) var(--rf-ease), color var(--rf-dur-fast) var(--rf-ease);
+}
+.shell-nav a b { font: var(--rf-t-micro); color: var(--rf-n-500); }
+.shell-nav a:hover { background: oklch(100% 0 0 / .06); color: var(--rf-n-0); }
+.shell-nav a.is-current { background: oklch(100% 0 0 / .11); color: var(--rf-n-0); }
+.shell-nav a.is-current b { color: var(--rf-accent); }
+
+/* ── intro ────────────────────────────────────────────────────────────────── */
+.shell-intro { padding: 44px 32px 22px; max-width: 880px; }
+.shell-intro h1 {
+  margin: 0 0 6px; font: var(--rf-t-title);
+  letter-spacing: var(--rf-tracking-title);
+}
+.shell-sub {
+  margin: 0 0 16px; font: var(--rf-t-caption);
+  letter-spacing: var(--rf-tracking-small);
+  text-transform: uppercase; color: var(--rf-n-500);
+}
+.shell-tagline { margin: 0; font: var(--rf-t-lead); color: var(--rf-n-300); max-width: 68ch; }
+
+/* ── control bar ──────────────────────────────────────────────────────────── */
+.shell-bar {
+  display: flex; gap: 28px; flex-wrap: wrap; align-items: center;
+  padding: 8px 32px 24px;
+}
+.shell-group { display: flex; gap: 4px; flex-wrap: wrap; }
+.shell-group button {
+  padding: 7px 12px; border-radius: var(--rf-r-4);
+  border: 1px solid oklch(100% 0 0 / .10);
+  background: oklch(100% 0 0 / .03); color: var(--rf-n-300);
+  font: var(--rf-t-micro); letter-spacing: var(--rf-tracking-small);
+  cursor: pointer;
+  transition: background var(--rf-dur-fast) var(--rf-ease), color var(--rf-dur-fast) var(--rf-ease);
+}
+.shell-group button:hover { background: oklch(100% 0 0 / .08); color: var(--rf-n-0); }
+.shell-group button.is-on {
+  background: var(--rf-accent); border-color: transparent; color: #fff;
+}
+.shell-group button:focus-visible {
+  outline: none; box-shadow: 0 0 0 2px #08080a, 0 0 0 4px var(--rf-accent);
+}
+
+/* ── layout ───────────────────────────────────────────────────────────────── */
+.shell-main {
+  display: flex; gap: 28px; align-items: flex-start;
+  padding: 0 32px 80px; flex-wrap: wrap;
+}
+.stage-wrap { flex: 1 1 700px; min-width: 0; }
+.stage-note {
+  margin: 12px 0 0; font: var(--rf-t-caption);
+  letter-spacing: var(--rf-tracking-small); color: var(--rf-n-500);
+}
+
+.stage {
+  position: relative; overflow: hidden;
+  border-radius: var(--rf-r-10);
+  max-width: 100%;
+  box-shadow: 0 40px 90px -30px oklch(0% 0 0 / .8), 0 0 0 1px oklch(100% 0 0 / .06);
+  /* the stage is the containing block for every glass surface's registration */
+  isolation: isolate;
+}
+.stage-bg {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+}
+
+/* ── side panel ───────────────────────────────────────────────────────────── */
+.panel {
+  flex: 0 0 300px;
+  border: 1px solid oklch(100% 0 0 / .09);
+  border-radius: var(--rf-r-9);
+  padding: 20px;
+  background: oklch(15% .008 264);
+}
+.panel h3 {
+  margin: 0 0 8px; font: var(--rf-t-micro);
+  letter-spacing: var(--rf-tracking-small); text-transform: uppercase;
+  color: var(--rf-n-500);
+}
+.panel h3 + * { margin-top: 0; }
+.panel h3:not(:first-child) { margin-top: 26px; }
+.panel-hint { margin: 0 0 14px; font: var(--rf-t-micro); color: var(--rf-n-500); line-height: 1.5; }
+.ctl { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+.ctl span { flex: 0 0 78px; font: var(--rf-t-micro); color: var(--rf-n-400); }
+.ctl input { flex: 1; min-width: 0; accent-color: var(--rf-accent); }
+.ctl b {
+  flex: 0 0 42px; text-align: right;
+  font: var(--rf-t-micro); font-variant-numeric: tabular-nums; color: var(--rf-n-200);
+}
+.panel-reset {
+  margin-top: 12px; width: 100%; padding: 8px;
+  border: 1px solid oklch(100% 0 0 / .12); border-radius: var(--rf-r-4);
+  background: transparent; color: var(--rf-n-300);
+  font: var(--rf-t-micro); cursor: pointer;
+}
+.panel-reset:hover { background: oklch(100% 0 0 / .06); color: var(--rf-n-0); }
+.panel table { width: 100%; border-collapse: collapse; }
+.panel td {
+  padding: 3px 0; font: var(--rf-t-micro); vertical-align: top;
+  font-variant-numeric: tabular-nums;
+}
+.panel td:first-child { color: var(--rf-n-500); padding-right: 10px; }
+.panel td:last-child { color: var(--rf-n-100); text-align: right; }
+.panel td.bad { color: oklch(70% .20 28); }
+
+/* ===========================================================================
+   The specimen board. Absolutely positioned for a designed composition rather
+   than an auto grid, and spaced so no two glass surfaces ever share an edge:
+   their rims would merge into a grey line and the illusion would die.
+   =========================================================================== */
+.board { position: absolute; inset: 0; }
+.board [data-rf-surface] { position: absolute; }
+
+.b-nav     { left: 28px;  top: 28px;  width: calc(100% - 56px); --rf-radius: var(--rf-r-9); --rf-pad: 10px; }
+.b-card    { left: 28px;  top: 110px; width: 520px; --rf-pad: 26px; }
+.b-controls{ left: 568px; top: 110px; width: 444px; --rf-pad: 22px; }
+.b-stat    { left: 28px;  top: 392px; width: 248px; --rf-pad: 18px; }
+.b-mono    { left: 296px; top: 392px; width: 252px; --rf-pad: 16px; --rf-radius: var(--rf-r-9); }
+.b-toast   { left: 568px; top: 392px; width: 300px; --rf-radius: var(--rf-r-pill); --rf-pad: 12px; }
+.b-dock    { left: 50%;   top: 556px; transform: translateX(-50%); --rf-radius: var(--rf-r-9); --rf-pad: 10px; }
+.b-lens    { left: 712px; top: 470px; width: 196px; height: 132px; --rf-pad: 0px; z-index: 5; }
+
+/* ── nav ──────────────────────────────────────────────────────────────────── */
+.b-nav-inner { display: flex; align-items: center; gap: 16px; }
+.b-brand {
+  display: flex; align-items: center; gap: 8px;
+  font: var(--rf-t-caption); font-weight: 590;
+  letter-spacing: -.006em; color: var(--rf-fg);
+}
+.b-seg {
+  display: flex; gap: 2px; margin-left: auto;
+  padding: 3px; border-radius: var(--rf-r-6);
+  background: oklch(from var(--rf-fg) l c h / .07);
+}
+.b-seg button {
+  padding: 6px 14px; border: 0; border-radius: var(--rf-r-4);
+  background: transparent; color: var(--rf-fg-dim);
+  font: var(--rf-t-caption); cursor: pointer;
+  transition: background var(--rf-dur-fast) var(--rf-ease), color var(--rf-dur-fast) var(--rf-ease);
+}
+.b-seg button[aria-selected="true"] {
+  background: oklch(from var(--rf-fg) l c h / .16); color: var(--rf-fg);
+  font-weight: 500;
+}
+.b-nav-actions { display: flex; gap: 4px; }
+.b-icon {
+  display: grid; place-items: center; width: 34px; height: 34px;
+  border: 0; border-radius: var(--rf-r-4);
+  background: transparent; color: var(--rf-fg-dim); cursor: pointer;
+}
+.b-icon:hover { background: oklch(from var(--rf-fg) l c h / .10); color: var(--rf-fg); }
+
+/* ── card ─────────────────────────────────────────────────────────────────── */
+.b-eyebrow {
+  margin: 0 0 10px; font: var(--rf-t-micro);
+  letter-spacing: var(--rf-tracking-small); text-transform: uppercase;
+  color: var(--rf-fg-faint);
+}
+.b-h2 {
+  margin: 0 0 12px; font: var(--rf-t-heading);
+  letter-spacing: -.008em; color: var(--rf-fg);
+  text-wrap: pretty;
+}
+.b-body {
+  margin: 0 0 20px; font: var(--rf-t-body); color: var(--rf-fg-dim);
+  max-width: 42ch; text-wrap: pretty;
+}
+.b-actions { display: flex; gap: 10px; }
+.b-btn {
+  padding: 11px 18px; border-radius: var(--rf-r-6);
+  border: 1px solid oklch(from var(--rf-fg) l c h / .22);
+  background: oklch(from var(--rf-fg) l c h / .07);
+  color: var(--rf-fg); font: var(--rf-t-caption); font-weight: 500;
+  cursor: pointer;
+  transition: background var(--rf-dur-fast) var(--rf-ease), transform var(--rf-dur-instant) var(--rf-ease);
+}
+.b-btn:hover { background: oklch(from var(--rf-fg) l c h / .13); }
+.b-btn:active { transform: scale(.97); }   /* proportional to the trigger, not 0.8 */
+.b-btn-primary {
+  background: var(--rf-accent); border-color: transparent; color: #fff;
+  box-shadow: var(--rf-elev-2);
+}
+.b-btn-primary:hover { background: var(--rf-accent-dim); }
+
+/* ── controls card ────────────────────────────────────────────────────────── */
+.b-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 9px 0; font: var(--rf-t-caption); color: var(--rf-fg-dim);
+  border-bottom: 1px solid oklch(from var(--rf-fg) l c h / .08);
+}
+.b-row > span { flex: 0 0 84px; }
+.b-row input[type="range"] { flex: 1; accent-color: var(--rf-accent); }
+.b-row-field input[type="text"] {
+  flex: 1; min-width: 0; padding: 8px 12px;
+  border: 1px solid oklch(from var(--rf-fg) l c h / .20);
+  border-radius: var(--rf-r-4);
+  background: oklch(from var(--rf-fg) l c h / .06);
+  color: var(--rf-fg); font: var(--rf-t-caption);
+}
+.b-switch {
+  position: relative; width: 46px; height: 27px; flex: 0 0 auto;
+  border: 1px solid oklch(from var(--rf-fg) l c h / .22);
+  border-radius: var(--rf-r-pill); cursor: pointer;
+  background: var(--rf-accent);
+  box-shadow: inset 0 1px 3px oklch(0% 0 0 / .22);
+  transition: background var(--rf-dur) var(--rf-ease);
+}
+.b-switch i {
+  position: absolute; inset: 2px auto 2px 2px; width: 21px;
+  border-radius: 50%;
+  background: linear-gradient(160deg, oklch(99% .01 264), oklch(88% .02 264));
+  box-shadow: 0 1px 3px oklch(0% 0 0 / .35);
+  transition: transform var(--rf-dur) var(--rf-ease);
+  transform: translateX(19px);
+}
+.b-switch[aria-checked="false"] { background: oklch(from var(--rf-fg) l c h / .16); }
+.b-switch[aria-checked="false"] i { transform: translateX(0); }
+.b-badges { display: flex; gap: 6px; margin-top: 14px; }
+.b-badge {
+  padding: 4px 10px; border-radius: var(--rf-r-pill);
+  border: 1px solid oklch(from var(--rf-fg) l c h / .18);
+  font: var(--rf-t-micro); color: var(--rf-fg-dim);
+}
+.b-badge-accent {
+  background: oklch(from var(--rf-accent) l c h / .22);
+  border-color: oklch(from var(--rf-accent) l c h / .45);
+  color: var(--rf-fg);
+}
+
+/* ── stat / mono / toast / dock ───────────────────────────────────────────── */
+.b-stat-n {
+  margin: 0; font: 600 40px/1.05 var(--rf-font);
+  letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--rf-fg);
+}
+.b-stat-sm { font-size: 26px; }
+.b-caption { margin: 4px 0 0; font: var(--rf-t-micro); color: var(--rf-fg-faint); }
+.b-hr { border: 0; border-top: 1px solid oklch(from var(--rf-fg) l c h / .12); margin: 14px 0; }
+.b-pre {
+  margin: 0; font: 400 11px/1.62 var(--rf-font-mono);
+  color: var(--rf-fg-dim); white-space: pre; overflow: hidden;
+}
+.b-toast [data-rf-content] { display: flex; align-items: center; gap: 10px; padding-left: 16px; }
+.b-toast span:last-child { font: var(--rf-t-caption); color: var(--rf-fg); }
+.b-toast-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto;
+  background: oklch(72% .18 152);
+  box-shadow: 0 0 0 3px oklch(72% .18 152 / .22);
+}
+.b-dock-inner { display: flex; gap: 4px; }
+.b-dock-btn {
+  display: grid; place-items: center; width: 48px; height: 48px;
+  border: 0; border-radius: var(--rf-r-7);
+  background: transparent; color: var(--rf-fg-dim); cursor: pointer;
+  transition: background var(--rf-dur-fast) var(--rf-ease),
+              transform var(--rf-dur-fast) var(--rf-ease), color var(--rf-dur-fast) var(--rf-ease);
+}
+.b-dock-btn:hover {
+  background: oklch(from var(--rf-fg) l c h / .12); color: var(--rf-fg);
+  transform: translateY(-2px);
+}
+
+/* ── the draggable lens ───────────────────────────────────────────────────── */
+.b-lens { cursor: grab; touch-action: none; }
+.b-lens.is-dragging { cursor: grabbing; }
+.b-lens [data-rf-content] { height: 100%; display: grid; place-items: center; }
+.b-lens-hint {
+  font: var(--rf-t-micro); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--rf-fg-faint); pointer-events: none;
+}
+
+/* ── reduced motion ───────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 1ms !important; transition-duration: 1ms !important; }
+}
+
+/* ── narrow screens: the stage is a fixed-geometry specimen, so scroll it
+   rather than reflowing it, which would break the comparison ─────────────── */
+@media (max-width: 1120px) {
+  .shell-main { flex-direction: column; }
+  .panel { flex: 1 1 auto; width: 100%; }
+  .stage-wrap { overflow-x: auto; width: 100%; }
+}

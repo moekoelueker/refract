@@ -213,3 +213,110 @@ date, and it is the missing primitive for adaptive foreground text on glass.
   after the encode/decode cycle.
 - The −0.38 px systematic offset: identify whether it is a half-texel convention
   and fold the correction into the derived scale.
+
+---
+
+## 2026-07-24 — Engine bake-off: five approaches, measured
+
+Built five distinct engines on one shared token layer and one byte-identical
+specimen board, then measured each across eight backdrops in three engines.
+Harness: `apps/bakeoff/`, capture and metrics in
+`apps/e2e/tests/bakeoff.spec.ts`, artifacts in `.local/bakeoff/`.
+
+Weighted scores: **A2 Edge 8.4, A1 Frost 8.1, A5 Shader 8.1, A3 Refract 7.8,
+A4 Native 5.9.** Recommendation is a ladder rather than a winner: A2 as the
+default for volume surfaces, A3 as the rationed flagship (it owns the
+cross-engine claim), A5 for media backdrops, A4 rejected.
+
+### Cross-engine rim delta, the claim under test
+
+| Approach | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- |
+| A3 Refract | 13.183 | 13.185 | 12.612 |
+| A5 Shader | 14.845 | 14.831 | 14.854 |
+| A4 Native | 6.477 | **0** | **0** |
+
+Interior delta was 0.0000 for all three displacement approaches in all three
+engines. A4 is silently flat outside Chromium, which is exactly why it is
+rejected rather than merely deprioritised.
+
+### Scroll cost, p95 frame time, eight simultaneous glass surfaces
+
+| Approach | Chromium | Firefox | WebKit |
+| --- | --- | --- | --- |
+| A1 Frost | 41.9 | 27.0 | 22.0 |
+| A2 Edge | 43.2 | **197** | 25.0 |
+| A3 Refract | **221** | 157 | **19.0** |
+| A4 Native | 154 | **266** | 18.0 |
+| A5 Shader | **20.0** | 51.0 | 18.0 |
+
+Three things here were genuinely counterintuitive:
+
+1. **The WebGL2 shader is the cheapest approach, cheaper than pure CSS.** The GPU
+   owns the work and scrolling never re-rasterises a filter. It is also the
+   highest-fidelity approach. The cost is elsewhere: it needs a texture rather
+   than live DOM, and nothing inside a canvas is selectable, printable or
+   reachable by a screen reader.
+2. **WebKit is the fastest engine for every single approach**, by a wide margin,
+   including the SVG path that is most expensive in the other two. The received
+   wisdom that Safari is the weak engine for glass is not what the numbers say.
+3. **A2's conic `mask-composite` sweep costs Firefox 197 ms p95** against 43 ms in
+   Chromium. The thing that makes the CSS-only bevel convincing is the thing that
+   makes it expensive there, so the default tier needs a Firefox simplification.
+
+### FINDING 013 — the default tint is wrong, and no engine can fix it
+
+Body text at 17px on the card, contrast sampled from **composited** pixels by
+capturing the region twice, once with the glyphs hidden:
+
+| Backdrop | A1/A2/A4 | A3 | A5 |
+| --- | --- | --- | --- |
+| Photographic | 2.23 | 3.17 | 2.25 |
+| Saturated | 1.87 | 2.35 | 2.05 |
+| Gradient mesh | 3.56 | 6.76 | 4.55 |
+| Minimal light | 7.05 | 6.81 | 7.09 |
+
+**Five of eight backdrops fail WCAG 4.5 at the dark scheme's tint alpha of
+0.16.** That is a token problem, not a rendering problem: Apple ships 0.8 and
+this reproduced precisely why tutorial glassmorphism's 0.1–0.2 is wrong. The
+default has to come up, and text belongs on a content plate with a solved
+minimum alpha rather than directly on the material.
+
+Worth noting: A3 and A5 score *better* than the CSS approaches on dark backdrops,
+because their frost is a real Gaussian inside the engine rather than a composited
+`backdrop-filter`. Refraction is not only decoration; it buys legibility. A3's
+outlier is the light mesh at 2.14, so the light scheme needs its own tint floor.
+
+### FINDING 009 — derived custom properties resolve where they are declared
+
+A custom property that derives from another is substituted **at its declaration
+site**, and descendants inherit the already-resolved text. So
+
+```css
+:root { --tint-a: .80; --tint-eff: calc(1 - (1 - var(--tint-a)) * var(--g)); }
+[data-scheme="dark"] { --tint-a: .16; }   /* never reaches --tint-eff */
+```
+
+leaves a dark surface reporting an effective alpha of **.80** while its own
+`--tint-a` is **.16**. Measured directly.
+
+The fix is a rule, not a patch: **derive nothing in the token layer.** Do the
+arithmetic at the point of use, in a real property on the element itself, where
+it resolves against that element's own cascade. The same applies in JS —
+`readMaterial()` recomputes rather than reading a pre-derived token.
+
+### FINDING 010 — `getComputedStyle` serialises `oklch()` as `oklch()`
+
+Scraping numbers out of a computed colour read lightness, chroma and hue as if
+they were r, g, b. A near-white tint became pure blue and every shader surface
+rendered solid accent colour. Paint one pixel to a canvas and read it back
+instead; that is the only place the colour-space conversion is guaranteed
+correct.
+
+### FINDING 011 — a GLSL type error fails silently through the whole stack
+
+`vec3 base = <vec2 expression>` does not compile, `createShaderSurface` threw,
+the catch stored `null`, and the surface fell back to a bare CSS tint that looked
+plausible enough to pass a glance. The rim-delta test caught it (0.000 where it
+should be ~15), which is a good argument for asserting the *effect* numerically
+rather than eyeballing a screenshot.

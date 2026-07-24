@@ -1,0 +1,306 @@
+/**
+ * Refract token layer. Plain CSS custom properties, no Tailwind, no build step.
+ * Works in a <link> tag, in Vite, in Astro, in Next.
+ *
+ * The values are not invented. The material numbers are read out of Apple's own
+ * shipped production CSS (globalheader.css, 2026-07-24): blur 20px,
+ * saturate(180%), tint alpha 0.8 — not the 0.08–0.2 that tutorial glassmorphism
+ * uses, which is the single most common reason fake glass looks fake.
+ *
+ * Rule for components: a component never contains a colour, an opacity, a blur
+ * radius or a shadow. Only var(--rf-*). That is what makes one component tree
+ * serve dark, light and high-contrast without duplication.
+ */
+
+:root {
+  /* ── neutrals ─────────────────────────────────────────────────────────────
+     Constant hue 264, chroma <= 0.012. Above that, neutrals start reading as
+     coloured and cheap. Anchored on Apple's rgb(250,250,252) / rgb(22,22,23):
+     cool-biased in light, near-neutral warm in dark, never pure #fff or #000. */
+  --rf-n-0:   oklch(99.2% .003 264);
+  --rf-n-50:  oklch(97.0% .004 264);
+  --rf-n-100: oklch(93.5% .005 264);
+  --rf-n-200: oklch(87.0% .006 264);
+  --rf-n-300: oklch(76.0% .008 264);
+  --rf-n-400: oklch(63.0% .010 264);
+  --rf-n-500: oklch(52.0% .011 264);
+  --rf-n-600: oklch(42.0% .012 264);
+  --rf-n-700: oklch(32.0% .012 264);
+  --rf-n-800: oklch(24.0% .011 264);
+  --rf-n-900: oklch(17.5% .009 264);
+  --rf-n-950: oklch(12.5% .006 264);
+
+  /* one accent hue for the whole UI. Discipline is the premium signal. */
+  --rf-accent:     oklch(62.3% .214 259.8);
+  --rf-accent-dim: oklch(54.0% .205 262);
+
+  /* ── the material ───────────────────────────────────────────────────────── */
+  --rf-tint: var(--rf-n-0);
+  --rf-tint-a: .80;            /* Apple's shipped alpha. Start here, go down only
+                                  if legibility allows. Never start at 0.15. */
+  --rf-blur: 20px;             /* Apple's shipped radius */
+  --rf-saturate: 1.8;          /* Apple ships saturate(180%). Omitting this is
+                                  why blur-only glass looks like tracing paper. */
+  --rf-border-a: .30;
+
+  /* optics, consumed by the JS engine as well as by CSS */
+  --rf-band: 26px;             /* width of the edge lens ring */
+  --rf-depth: 22px;            /* apparent glass thickness */
+  --rf-curvature: 3.2;
+  --rf-ior: 1.45;
+  --rf-chroma: .55;            /* dispersion strength, 0..1 */
+  --rf-specular: .55;
+  --rf-specular-angle: 145deg;
+  --rf-specular-power: 18;
+  --rf-profile: convex;
+
+  /* ── the glassiness control ──────────────────────────────────────────────
+     A user-facing, persisted control is not a nice-to-have. Apple shipped one,
+     twice, and it is the only way to serve reduce-transparency users in Safari,
+     which does not expose prefers-reduced-transparency at all.
+     1 = full glass, 0 = fully opaque. */
+  --rf-glassiness: 1;
+
+  /* FINDING 009: a custom property that derives from another custom property is
+     substituted where it is DECLARED, and descendants then inherit the
+     already-resolved text. So a derived token declared here at :root bakes in
+     :root's inputs, and a later [data-rf-scheme="dark"] override of those inputs
+     never reaches it. Measured: a dark surface reported an effective tint alpha
+     of .80 while its own --rf-tint-a was .16.
+     Therefore Refract derives NOTHING in the token layer. Every derivation
+     happens at the point of USE, in a real property on the element itself
+     (see the background on [data-rf-surface] below), where it resolves against
+     that element's own cascade. The same rule applies in JS: readMaterial()
+     recomputes rather than reading a pre-derived token. */
+
+  /* ── radius. The 999 pill is a real Apple token (they ship 980px). ─────── */
+  --rf-r-1: 2px;  --rf-r-2: 4px;  --rf-r-3: 6px;  --rf-r-4: 8px;
+  --rf-r-5: 10px; --rf-r-6: 12px; --rf-r-7: 14px; --rf-r-8: 16px;
+  --rf-r-9: 20px; --rf-r-10: 24px; --rf-r-11: 28px; --rf-r-12: 32px;
+  --rf-r-pill: 999px;
+  --rf-radius: var(--rf-r-11);
+  --rf-pad: 20px;
+  /* concentricity: Apple nests glass controls so corner arcs stay parallel.
+     r_inner = r_outer - padding. Never eyeball this. */
+  --rf-radius-inner: max(0px, calc(var(--rf-radius) - var(--rf-pad)));
+
+  /* ── shadows. Four layers, offset and blur DOUBLING each step, alpha roughly
+     constant rather than decaying. Tinted toward the ambient, never pure black:
+     real shadows are the colour of the sky, and a single black layer is the
+     instantly recognisable glassmorphism default. ───────────────────────── */
+  --rf-shadow-hue: 265;
+  --rf-shadow-c: .03;
+  --rf-elev-1:
+    0 1px 2px -1px oklch(24% var(--rf-shadow-c) var(--rf-shadow-hue) / .18);
+  --rf-elev-2:
+    0 1px 2px -1px oklch(24% var(--rf-shadow-c) var(--rf-shadow-hue) / .18),
+    0 4px 8px -2px oklch(24% var(--rf-shadow-c) var(--rf-shadow-hue) / .16);
+  --rf-elev-3:
+    0 1px 2px -1px  oklch(24% var(--rf-shadow-c) var(--rf-shadow-hue) / .18),
+    0 4px 8px -2px  oklch(24% var(--rf-shadow-c) var(--rf-shadow-hue) / .16),
+    0 12px 24px -6px oklch(24% var(--rf-shadow-c) var(--rf-shadow-hue) / .14);
+  --rf-elev-4:
+    0 1px 2px -1px   oklch(24% var(--rf-shadow-c) var(--rf-shadow-hue) / .18),
+    0 4px 8px -2px   oklch(24% var(--rf-shadow-c) var(--rf-shadow-hue) / .16),
+    0 12px 24px -6px oklch(24% var(--rf-shadow-c) var(--rf-shadow-hue) / .14),
+    0 32px 64px -16px oklch(24% var(--rf-shadow-c) var(--rf-shadow-hue) / .18);
+
+  /* inner rim. Bright lit edge, dim bounce edge, plus the glass's own thickness. */
+  --rf-rim-top: .40;
+  --rf-rim-bottom: .10;
+  --rf-rim-inner-glow: .06;
+
+  /* ── type. Apple's own steps, leading set in whole px and expressed as a
+     ratio, tracking negative on display sizes and positive on small text. ── */
+  --rf-font: "Geist", "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --rf-font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --rf-t-micro: 500 12px/1.3333 var(--rf-font);
+  --rf-t-caption: 450 14px/1.3571 var(--rf-font);
+  --rf-t-body: 400 17px/1.3529 var(--rf-font);
+  --rf-t-lead: 400 21px/1.2857 var(--rf-font);
+  --rf-t-heading: 590 24px/1.2917 var(--rf-font);
+  --rf-t-title: 600 32px/1.125 var(--rf-font);
+  --rf-t-display: 600 48px/1.0833 var(--rf-font);
+  --rf-tracking-display: -.019em;
+  --rf-tracking-title: -.014em;
+  --rf-tracking-body: 0em;
+  --rf-tracking-small: .009em;
+
+  /* text on glass. Never below weight 400: thin type over a moving backdrop is
+     a shimmer, not text. */
+  --rf-fg: var(--rf-n-0);
+  --rf-fg-dim: oklch(99.2% .003 264 / .72);
+  --rf-fg-faint: oklch(99.2% .003 264 / .50);
+
+  /* ── motion. Apple's real curves and durations, by occurrence count in their
+     own CSS: cubic-bezier(.4,0,.6,1) appears 122 times; nothing above 400ms. */
+  --rf-ease: cubic-bezier(.4, 0, .6, 1);
+  --rf-ease-out: cubic-bezier(.25, .1, .3, 1);
+  --rf-dur-instant: 80ms;
+  --rf-dur-fast: 160ms;
+  --rf-dur: 240ms;
+  --rf-dur-slow: 320ms;
+
+  /* grain hides backdrop-filter banding and adds micro-texture. If you can see
+     it as texture at 100% zoom it reads as a JPEG artefact. */
+  --rf-grain: .045;
+
+  --rf-focus: var(--rf-accent);
+}
+
+/* ── light scheme ───────────────────────────────────────────────────────── */
+[data-rf-scheme="light"] {
+  --rf-tint: var(--rf-n-0);
+  --rf-tint-a: .72;
+  --rf-border-a: .55;
+  --rf-rim-top: .85;
+  --rf-rim-bottom: .04;
+  --rf-rim-inner-glow: .30;
+  --rf-fg: oklch(20% .012 264);
+  --rf-fg-dim: oklch(20% .012 264 / .72);
+  --rf-fg-faint: oklch(20% .012 264 / .52);
+  --rf-shadow-c: .022;
+  --rf-grain: .028;
+}
+
+/* ── dark scheme: same white rim, alphas reduced ~35%, plus an outer dark line
+   so the panel does not glow like a lightbox. ─────────────────────────────── */
+[data-rf-scheme="dark"] {
+  --rf-tint: var(--rf-n-0);
+  --rf-tint-a: .16;
+  --rf-border-a: .28;
+  --rf-rim-top: .40;
+  --rf-rim-bottom: .10;
+  --rf-fg: var(--rf-n-0);
+}
+
+/* ── accessibility, wired at the TOKEN level so no component needs to know ──
+   Every media query has a data-attribute twin: consumers get a manual toggle
+   for free, and prefers-contrast becomes testable in engines that cannot
+   emulate it. */
+
+/* Reduce transparency means FROSTIER, not more transparent. Raising alpha AND
+   blur is the correct response; lowering alpha is the most common bug in the
+   field. */
+@media (prefers-reduced-transparency: reduce) {
+  :root { --rf-glassiness: .12; --rf-blur: 30px; --rf-chroma: 0; --rf-specular: .2; }
+}
+[data-rf-transparency="reduce"] {
+  --rf-glassiness: .12; --rf-blur: 30px; --rf-chroma: 0; --rf-specular: .2;
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --rf-glassiness: .18;
+    --rf-border-a: .75;
+    --rf-fg-dim: var(--rf-fg);
+    --rf-fg-faint: var(--rf-fg);
+    --rf-chroma: 0;
+    --rf-specular: .15;
+  }
+}
+[data-rf-contrast="more"] {
+  --rf-glassiness: .18;
+  --rf-border-a: .75;
+  --rf-fg-dim: var(--rf-fg);
+  --rf-fg-faint: var(--rf-fg);
+  --rf-chroma: 0;
+  --rf-specular: .15;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --rf-dur-instant: 1ms; --rf-dur-fast: 1ms; --rf-dur: 1ms; --rf-dur-slow: 1ms; }
+}
+[data-rf-motion="reduce"] {
+  --rf-dur-instant: 1ms; --rf-dur-fast: 1ms; --rf-dur: 1ms; --rf-dur-slow: 1ms;
+}
+
+/* ── the surface itself ─────────────────────────────────────────────────── */
+[data-rf-surface] {
+  position: relative;
+  border-radius: var(--rf-radius);
+  color: var(--rf-fg);
+  font: var(--rf-t-body);
+  letter-spacing: var(--rf-tracking-body);
+  /* asymmetric gradient rim. A uniform 1px rgba(255,255,255,.3) border on all
+     four sides is the single most common giveaway of fake glass: real glass has
+     a bright lit edge and a dark unlit edge. 145deg puts the bright arc at the
+     top-left with a secondary catch bottom-right for bounce light. */
+  border: 1px solid transparent;
+  background:
+    linear-gradient(
+      color-mix(in oklab,
+        var(--rf-tint)
+        calc((1 - (1 - var(--rf-tint-a)) * var(--rf-glassiness)) * 100%),
+        transparent) 0 0) padding-box,
+    linear-gradient(145deg,
+      oklch(100% 0 0 / calc(var(--rf-border-a) * 1.85)) 0%,
+      oklch(100% 0 0 / calc(var(--rf-border-a) * 0.34)) 38%,
+      oklch(100% 0 0 / calc(var(--rf-border-a) * 0.07)) 55%,
+      oklch(100% 0 0 / calc(var(--rf-border-a) * 0.74)) 100%) border-box;
+  box-shadow:
+    inset 0  1px 0 0 oklch(100% 0 0 / var(--rf-rim-top)),
+    inset 0 -1px 0 0 oklch(100% 0 0 / var(--rf-rim-bottom)),
+    inset 0  0 24px 0 oklch(100% 0 0 / var(--rf-rim-inner-glow)),
+    var(--rf-elev-4);
+  /* clips the lens layer's overspill back to the rounded rect */
+  overflow: hidden;
+  isolation: isolate;
+}
+
+[data-rf-scheme="dark"][data-rf-surface] {
+  box-shadow:
+    inset 0 0 0 1px oklch(0% 0 0 / .35),
+    inset 0  1px 0 0 oklch(100% 0 0 / var(--rf-rim-top)),
+    inset 0 -1px 0 0 oklch(100% 0 0 / var(--rf-rim-bottom)),
+    inset 0  0 24px 0 oklch(100% 0 0 / var(--rf-rim-inner-glow)),
+    var(--rf-elev-4);
+}
+
+/* squircles are pure progressive enhancement: corner-shape is Chromium-only.
+   Never fake them with an SVG clip-path on glass — it kills backdrop-filter in
+   nested stacking contexts and forbids real box-shadows. */
+@supports (corner-shape: squircle) {
+  [data-rf-surface][data-rf-corner="squircle"] { corner-shape: squircle; }
+}
+
+/* the lens layer: the only node that ever carries `filter`, and deliberately
+   LARGER than the surface by the displacement margin. See ADR-002. */
+[data-rf-lens] {
+  position: absolute;
+  inset: -20%;
+  overflow: hidden;          /* stable bounding box in every engine */
+  pointer-events: none;
+  z-index: 0;
+}
+
+[data-rf-content] {
+  position: relative;
+  z-index: 1;
+  padding: var(--rf-pad);
+}
+[data-rf-content] > * { border-radius: var(--rf-radius-inner); }
+
+/* focus rings via box-shadow, not outline: an outline on a 28px-radius glass
+   panel draws a visible rectangle. */
+[data-rf-surface] :focus-visible,
+[data-rf-focusable]:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px oklch(0% 0 0 / .55),
+    0 0 0 4px var(--rf-focus);
+}
+
+/* forced colors: the material goes away entirely and system colours take over. */
+@media (forced-colors: active) {
+  [data-rf-surface] {
+    background: Canvas !important;
+    color: CanvasText !important;
+    border: 1px solid CanvasText !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    forced-color-adjust: none;
+  }
+  [data-rf-lens] { display: none !important; }
+  [data-rf-surface] :focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }
+}

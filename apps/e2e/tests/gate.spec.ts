@@ -12,7 +12,7 @@ const record = (name: string, payload: unknown) =>
 // GATE 1 — the primitive exists and the graph is what we think it is
 // ---------------------------------------------------------------------------
 test('the filter graph renders and reports healthy', async ({ page }, info) => {
-  await page.goto('/index.html');
+  await page.goto('/apps/lab/index.html');
   await page.waitForFunction(() => !!(window as any).__refract);
 
   const state = await page.evaluate(() => {
@@ -85,7 +85,7 @@ test('the filter graph renders and reports healthy', async ({ page }, info) => {
 // substantially and leaves the interior alone.
 // ---------------------------------------------------------------------------
 test('refraction bends the rim and leaves the interior neutral', async ({ page }, info) => {
-  await page.goto('/index.html');
+  await page.goto('/apps/lab/index.html');
   await page.waitForFunction(() => !!(window as any).__refract);
 
   const setMaterial = (depth: number) =>
@@ -142,7 +142,7 @@ test('refraction bends the rim and leaves the interior neutral', async ({ page }
 // ---------------------------------------------------------------------------
 for (const units of ['user', 'obb'] as const) {
   test(`displacement magnitude is correct in px (units=${units})`, async ({ page }, info) => {
-    await page.goto(`/calibrate-scale.html?units=${units}&r=192&scale=40`);
+    await page.goto(`/apps/lab/calibrate-scale.html?units=${units}&r=192&scale=40`);
     await page.waitForFunction(() => !!(window as any).__cal);
 
     const cal = await page.evaluate(() => (window as any).__cal);
@@ -188,7 +188,7 @@ for (const units of ['user', 'obb'] as const) {
 // are untouched: selectable and clickable through the glass.
 // ---------------------------------------------------------------------------
 test('text on the glass is selectable and its link is clickable', async ({ page }, info) => {
-  await page.goto('/index.html');
+  await page.goto('/apps/lab/index.html');
   await page.waitForFunction(() => !!(window as any).__refract);
 
   const para = page.locator('#glass .content p');
@@ -231,7 +231,7 @@ test('text on the glass is selectable and its link is clickable', async ({ page 
 // registered with the real backdrop. Aave's key perf insight, asserted.
 // ---------------------------------------------------------------------------
 test('dragging moves the region without regenerating the map', async ({ page }, info) => {
-  await page.goto('/index.html');
+  await page.goto('/apps/lab/index.html');
   await page.waitForFunction(() => !!(window as any).__refract);
 
   const versionOf = () =>
@@ -267,7 +267,7 @@ test('dragging moves the region without regenerating the map', async ({ page }, 
 // GATE 6 — the visual record. Three engines, same surface, committed baselines.
 // ---------------------------------------------------------------------------
 test('visual record of the stage', async ({ page }, info) => {
-  await page.goto('/index.html');
+  await page.goto('/apps/lab/index.html');
   await page.waitForFunction(() => !!(window as any).__refract);
   await page.evaluate(() => {
     const d: Record<string, number> = {

@@ -33,7 +33,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'python3 -m http.server 4599 --directory ../lab',
+    command: 'python3 -m http.server 4599 --directory ../..',
     port: 4599,
     reuseExistingServer: true,
     stdout: 'ignore',

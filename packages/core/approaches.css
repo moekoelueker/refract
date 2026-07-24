@@ -1,0 +1,130 @@
+/**
+ * Per-approach styling. Everything that can be static CSS lives here, so the JS
+ * in approaches.js only does what CSS genuinely cannot: generate a displacement
+ * map, install an SVG filter graph, or drive a WebGL context.
+ *
+ * All five approaches share the token layer and the same rim, shadow, type and
+ * spacing, so the comparison isolates the ENGINE rather than the theme.
+ */
+
+/* ── A1 Frost ───────────────────────────────────────────────────────────────
+   backdrop-filter only. No lens, no refraction. The universal baseline: no JS,
+   SSR-safe, renders identically before hydration. */
+[data-rf-approach="frost"] {
+  backdrop-filter: saturate(var(--rf-saturate)) blur(calc(var(--rf-blur) * var(--rf-glassiness)));
+  -webkit-backdrop-filter: saturate(var(--rf-saturate)) blur(calc(var(--rf-blur) * var(--rf-glassiness)));
+}
+
+/* ── A2 Edge ────────────────────────────────────────────────────────────────
+   Frost plus a pure-CSS edge treatment that fakes the lens ring: a layered
+   inner bevel, and a directional conic sweep confined to the band. No SVG
+   filter, so it costs essentially nothing beyond the blur, and it still reads
+   as a thick material rather than a flat pane. */
+[data-rf-approach="edge"] {
+  backdrop-filter: saturate(var(--rf-saturate)) blur(calc(var(--rf-blur) * var(--rf-glassiness)));
+  -webkit-backdrop-filter: saturate(var(--rf-saturate)) blur(calc(var(--rf-blur) * var(--rf-glassiness)));
+}
+[data-rf-approach="edge"] .rf-bevel,
+[data-rf-approach="edge"] .rf-sweep {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+}
+/* the bevel: concentric inner rings of light, tightest at the edge */
+[data-rf-approach="edge"] .rf-bevel {
+  box-shadow:
+    inset 0 0 0 1px oklch(100% 0 0 / calc(var(--rf-border-a) * 1.5)),
+    inset 0 0 3px 1px oklch(100% 0 0 / calc(var(--rf-rim-top) * .40)),
+    inset 0 0 10px 3px oklch(100% 0 0 / calc(var(--rf-rim-top) * .18)),
+    inset 0 0 26px 10px oklch(100% 0 0 / calc(var(--rf-rim-top) * .08)),
+    inset 0 0 0 calc(var(--rf-band) * .5) oklch(0% 0 0 / .03);
+}
+/* the sweep: a conic gradient masked to the band only, so the highlight travels
+   round the rim with the light angle instead of sitting on one flat edge */
+[data-rf-approach="edge"] .rf-sweep {
+  padding: var(--rf-band);
+  background: conic-gradient(
+      from calc(var(--rf-specular-angle) - 90deg),
+      oklch(100% 0 0 / 0) 0deg,
+      oklch(100% 0 0 / calc(var(--rf-specular) * .55)) 42deg,
+      oklch(100% 0 0 / 0) 110deg,
+      oklch(100% 0 0 / 0) 190deg,
+      oklch(100% 0 0 / calc(var(--rf-specular) * .22)) 236deg,
+      oklch(100% 0 0 / 0) 310deg,
+      oklch(100% 0 0 / 0) 360deg)
+    border-box;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+}
+
+/* ── A3 Refract ─────────────────────────────────────────────────────────────
+   The cross-browser engine. The lens layer holds a registered copy of the
+   declared backdrop and carries the SVG filter. Frost and vibrancy move INSIDE
+   the filter, because `filter` establishes a backdrop root and would otherwise
+   starve backdrop-filter (FINDING 001). */
+[data-rf-approach="refract"] .rf-clone {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  /* position and size are set from JS as custom properties, so moving a surface
+     never regenerates the map and never re-renders anything */
+  background-position: var(--rf-src-x, 0px) var(--rf-src-y, 0px);
+  background-size: var(--rf-src-w, auto) var(--rf-src-h, auto);
+  transform: translateZ(0);
+}
+
+/* ── A4 Native ──────────────────────────────────────────────────────────────
+   backdrop-filter: url(#id) against the REAL backdrop. No clone, so nothing can
+   ever desynchronise and arbitrary page content refracts for free. Chromium
+   only, which is the entire catch. */
+[data-rf-approach="native"] {
+  backdrop-filter: saturate(var(--rf-saturate)) blur(calc(var(--rf-blur) * var(--rf-glassiness)));
+  -webkit-backdrop-filter: saturate(var(--rf-saturate)) blur(calc(var(--rf-blur) * var(--rf-glassiness)));
+}
+[data-rf-approach="native"][data-rf-native="on"] {
+  /* the filter reference is appended from JS so the id can be versioned */
+  backdrop-filter: var(--rf-native-filter);
+  -webkit-backdrop-filter: var(--rf-native-filter);
+}
+[data-rf-approach="native"][data-rf-native="unsupported"]::after {
+  content: "backdrop-filter: url() not rendered by this engine — showing frost";
+  position: absolute;
+  inset: auto 8px 8px 8px;
+  font: var(--rf-t-micro);
+  letter-spacing: var(--rf-tracking-small);
+  color: oklch(75% .16 60);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* ── A5 Shader ──────────────────────────────────────────────────────────────
+   WebGL2. Real per-channel dispersion and a Fresnel rim, sampling the backdrop
+   as a texture. The only approach that can refract live video or canvas, which
+   is exactly the case Safari refuses to filter. */
+[data-rf-approach="shader"] .rf-gl {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── grain. Pre-rasterised and never animated: a full-viewport animated
+   feTurbulence is one of the most expensive things you can put on a page. ── */
+[data-rf-grain] .rf-grain {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 1;
+  opacity: var(--rf-grain);
+  mix-blend-mode: overlay;
+  background-image: var(--rf-grain-url);
+  background-size: 128px 128px;
+}
