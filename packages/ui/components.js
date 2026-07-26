@@ -90,6 +90,8 @@ export function Surface({ role = 'content', grain = true, class: cls = '', ...at
     'data-rf-grain': grain || null,
     ...attrs,
   });
+  // the veil carries the material's colour and MUST sit above the lens
+  el.append(h('div', { 'data-rf-veil': true, 'aria-hidden': 'true' }));
   if (grain) el.append(h('div', { class: 'rf-grain', 'aria-hidden': 'true' }));
   el.append(h('div', { 'data-rf-content': true }, ...kids));
   return el;

@@ -227,12 +227,15 @@
      a bright lit edge and a dark unlit edge. 145deg puts the bright arc at the
      top-left with a secondary catch bottom-right for bounce light. */
   border: 1px solid transparent;
+  /* FINDING 018: the tint must be composited ABOVE the refraction, not below it.
+     Putting it on the surface's own background paints it BEHIND the surface's
+     children, so the lens layer holding the refracted backdrop covered it
+     completely. The effective background behind every glyph was therefore the raw
+     backdrop, which is why raising tint alpha changed nothing and why measured
+     contrast tracked backdrop luminance exactly. The tint now lives on
+     [data-rf-veil], stacked above the lens. */
   background:
-    linear-gradient(
-      color-mix(in oklab,
-        var(--rf-tint)
-        calc((1 - (1 - var(--rf-tint-a)) * var(--rf-glassiness)) * 100%),
-        transparent) 0 0) padding-box,
+    linear-gradient(transparent 0 0) padding-box,
     linear-gradient(145deg,
       oklch(100% 0 0 / calc(var(--rf-border-a) * 1.85)) 0%,
       oklch(100% 0 0 / calc(var(--rf-border-a) * 0.34)) 38%,
@@ -274,9 +277,23 @@
   z-index: 0;
 }
 
+/* the material's colour, above the refraction. This is what text is legible
+   against, so it is the only thing the contrast gate can be raised through. */
+[data-rf-veil] {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: color-mix(in oklab,
+    var(--rf-tint)
+    calc((1 - (1 - var(--rf-tint-a)) * var(--rf-glassiness)) * 100%),
+    transparent);
+}
+
 [data-rf-content] {
   position: relative;
-  z-index: 1;
+  z-index: 3;
   padding: var(--rf-pad);
 }
 [data-rf-content] > * { border-radius: var(--rf-radius-inner); }

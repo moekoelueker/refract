@@ -41,6 +41,11 @@ const BUNDLES = [
     modules: [...CORE, 'packages/ui/components.js', 'apps/gallery/lib/scenes.js', 'apps/gallery/lib/gallery.js'],
     expose: 'window.mountGallery = __M.gallery.mountGallery;',
   },
+  {
+    out: 'apps/gallery/lib/editorial-bundle.js',
+    modules: [...CORE, 'packages/ui/components.js', 'apps/gallery/lib/scenes.js', 'apps/gallery/lib/editorial.js'],
+    expose: 'window.mountEditorial = __M.editorial.mountEditorial;',
+  },
 ];
 
 /** Rewrite one module's source into a registry factory. */

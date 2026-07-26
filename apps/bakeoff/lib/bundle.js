@@ -1492,6 +1492,7 @@ const icon = (d, size = 20) =>
 /** A glass surface wrapper. Every one gets grain and a content plate. */
 const surface = (cls, inner, attrs = '') =>
   `<div class="${cls}" data-rf-surface data-rf-grain ${attrs}>
+     <div data-rf-veil aria-hidden="true"></div>
      <div class="rf-grain"></div>
      <div data-rf-content>${inner}</div>
    </div>`;

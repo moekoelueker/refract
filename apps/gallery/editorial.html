@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en" data-rf-scheme="dark" data-rf-accent="copper" data-rf-preset="hybrid" data-e-tone="ink">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Refract — three finalists, a research report</title>
+<link rel="stylesheet" href="../../packages/core/tokens.css">
+<link rel="stylesheet" href="../../packages/core/approaches.css">
+<link rel="stylesheet" href="../../packages/ui/presets.css">
+<link rel="stylesheet" href="../../packages/ui/ui.css">
+<link rel="stylesheet" href="./lib/editorial.css">
+<body>
+<div id="app"><div class="boot">
+  <h1>Refract — research report</h1>
+  <p id="boot-msg">Loading the three finalists&hellip;</p>
+  <pre id="boot-err" hidden></pre>
+</div></div>
+<script src="./lib/editorial-bundle.js"></script>
+<script>
+  (function () {
+    var msg = document.getElementById('boot-msg'), err = document.getElementById('boot-err');
+    function fail(w) { if (!msg) return; msg.textContent = 'This page could not start.'; err.hidden = false; err.textContent = w; }
+    window.addEventListener('error', function (e) {
+      fail((e.message || 'script error') + (e.filename ? '\n' + e.filename + ':' + e.lineno : ''));
+    });
+    if (typeof window.mountEditorial !== 'function') {
+      return fail('lib/editorial-bundle.js did not load.\nLocation: ' + location.href + '\nRun "npm run bundle".');
+    }
+    try { window.mountEditorial(); } catch (e) { fail(String((e && e.stack) || e)); }
+  })();
+</script>
+</body>
+</html>

@@ -25,11 +25,12 @@
   margin: 0 0 10px; font: var(--rf-t-micro);
   letter-spacing: var(--rf-tracking-small); text-transform: uppercase;
   color: var(--rf-fg-faint);
+  font-weight: 590;
 }
 .u-title { margin: 0 0 10px; font: var(--rf-t-heading); letter-spacing: -.008em; color: var(--rf-fg); text-wrap: pretty; }
 .u-display { margin: 0 0 12px; font: var(--rf-t-title); letter-spacing: var(--rf-tracking-title); color: var(--rf-fg); text-wrap: balance; }
 .u-body { margin: 0 0 16px; font: var(--rf-t-body); color: var(--rf-fg-dim); max-width: 46ch; text-wrap: pretty; }
-.u-caption { margin: 0; font: var(--rf-t-caption); color: var(--rf-fg-faint); }
+.u-caption { margin: 0; font: var(--rf-t-caption); color: var(--rf-fg-dim); }
 .u-mono { font: 400 12px/1.62 var(--rf-font-mono); color: var(--rf-fg-dim); }
 .u-num { font: 600 40px/1.02 var(--rf-font); letter-spacing: -.021em; font-variant-numeric: tabular-nums; color: var(--rf-fg); }
 
@@ -45,15 +46,15 @@
 .u-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   padding: 11px 18px; border-radius: var(--rf-r-6);
-  border: 1px solid color-mix(in oklab, var(--rf-fg) 20%, transparent);
-  background: color-mix(in oklab, var(--rf-fg) 7%, transparent);
+  border: 1px solid color-mix(in oklab, var(--rf-fg) 34%, transparent);
+  background: color-mix(in oklab, var(--rf-fg) 12%, transparent);
   color: var(--rf-fg); font: var(--rf-t-caption); font-weight: 500;
   cursor: pointer; white-space: nowrap;
   transition: background var(--rf-dur-fast) var(--rf-ease),
               transform var(--rf-dur-instant) var(--rf-ease),
               border-color var(--rf-dur-fast) var(--rf-ease);
 }
-.u-btn:hover { background: color-mix(in oklab, var(--rf-fg) 13%, transparent); }
+.u-btn:hover { background: color-mix(in oklab, var(--rf-fg) 25%, transparent); }
 .u-btn:active { transform: scale(.97); }        /* proportional to the trigger */
 .u-btn[disabled] { opacity: .42; cursor: not-allowed; transform: none; }
 
@@ -85,13 +86,16 @@
 .u-seg, .u-tablist {
   display: inline-flex; gap: 2px; padding: 3px;
   border-radius: var(--rf-r-6);
-  background: color-mix(in oklab, var(--rf-fg) 7%, transparent);
+  /* MEASURED: at 14% the unselected label landed at 4.37 over a photographic
+     backdrop, just under the 4.5 floor. The track fill, not the label colour, is
+     what carries it. */
+  background: color-mix(in oklab, var(--rf-fg) 22%, transparent);
   position: relative;
 }
 .u-seg button, .u-tablist button {
   position: relative; z-index: 1;
   padding: 7px 15px; border: 0; border-radius: var(--rf-r-4);
-  background: transparent; color: var(--rf-fg-dim);
+  background: transparent; color: var(--rf-fg);
   font: var(--rf-t-caption); cursor: pointer;
   transition: color var(--rf-dur-fast) var(--rf-ease);
 }
@@ -265,8 +269,9 @@
 .u-badge {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 3px 9px; border-radius: var(--rf-r-pill);
-  border: 1px solid color-mix(in oklab, var(--rf-fg) 17%, transparent);
-  font: var(--rf-t-micro); color: var(--rf-fg-dim); white-space: nowrap;
+  border: 1px solid color-mix(in oklab, var(--rf-fg) 30%, transparent);
+  background: color-mix(in oklab, var(--rf-fg) 12%, transparent);
+  font: var(--rf-t-micro); color: var(--rf-fg); white-space: nowrap;
 }
 .u-badge--accent { background: var(--rf-accent-soft); border-color: transparent; color: var(--rf-fg); }
 .u-badge--dot::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
@@ -327,21 +332,30 @@
   color: var(--rf-fg-faint); cursor: pointer; user-select: none; white-space: nowrap;
 }
 .u-table th[aria-sort] { color: var(--rf-fg); }
-.u-table td { color: var(--rf-fg-dim); }
+.u-table td { color: var(--rf-fg); }
 .u-table tbody tr:hover td { background: color-mix(in oklab, var(--rf-fg) 5%, transparent); }
 .u-table .u-num-cell { text-align: right; }
 
 .u-avatar {
   display: grid; place-items: center; border-radius: 50%; flex: 0 0 auto;
   width: 34px; height: 34px;
-  font: var(--rf-t-micro); font-weight: 590; letter-spacing: 0;
+  font: 590 11px/1 var(--rf-font); letter-spacing: .01em;
   color: var(--rf-fg);
   background: color-mix(in oklab, var(--rf-fg) 15%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--rf-fg) 16%, transparent);
 }
+/* Overlapping avatars only read as a stack if the ring matches the SURFACE they
+   sit on, so it reads as a cutout rather than an outline. A hard ring in a fixed
+   colour looks like scribble over glass. -7px on a 34px circle keeps every set of
+   initials fully legible. */
 .u-avatars { display: flex; }
-.u-avatars .u-avatar + .u-avatar { margin-left: -10px; }
-.u-avatars .u-avatar { box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--rf-fg) 16%, transparent), 0 0 0 2px var(--rf-plate); }
+.u-avatars .u-avatar + .u-avatar { margin-left: -7px; }
+.u-avatars .u-avatar {
+  background: color-mix(in oklab, var(--rf-fg) 20%, var(--rf-tint));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in oklab, var(--rf-fg) 20%, transparent),
+    0 0 0 2px color-mix(in oklab, var(--rf-tint) 70%, transparent);
+}
 
 .u-accordion { display: flex; flex-direction: column; }
 .u-accordion-item + .u-accordion-item { border-top: 1px solid color-mix(in oklab, var(--rf-fg) 10%, transparent); }

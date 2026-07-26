@@ -418,3 +418,68 @@ The generated bundle header contained `apps/*/lib`. The `*/` terminated the
 comment, and the rest of the header parsed as code, producing
 `SyntaxError: Unexpected token 'with'` from prose. Both bundles were dead. Worth
 remembering when generating comments programmatically.
+
+---
+
+## 2026-07-25 — FINDING 018: the tint was never composited over the refraction
+
+Reported as a visible defect: a chrome bar rendering near-white with white text.
+Two bugs, one of which invalidates an earlier conclusion.
+
+**FINDING 017 — tint polarity.** The tint must share the scheme's polarity. Apple's
+dark nav is `rgba(22,22,23,.8)`, a near-black tint. I used a *white* tint on the
+dark scheme and then raised its alpha for legibility, which does the opposite of
+what was intended: the surface moves TOWARD the white foreground. Raising alpha
+only helps when the tint moves the surface AWAY from the ink.
+
+**FINDING 018 — the veil.** The tint lived on the surface's own `background`,
+which paints BEHIND that element's children. The lens layer carrying the refracted
+backdrop is a child, so it covered the tint completely. The effective background
+behind every glyph was therefore the raw backdrop.
+
+This explains, and corrects, the earlier bake-off conclusion. Those measurements
+(photo 2.23, saturated 1.87, minimal 7.05) tracked backdrop luminance exactly
+because **the material colour was not in the composite at all**. I read that as
+"the default tint token is too low". The real cause was structural, and no token
+value could have fixed it — raising tint alpha from .16 to .52 to .88 moved the
+measured contrast by almost nothing, which should have told me sooner.
+
+Fix: the tint moves to `[data-rf-veil]`, with explicit z-index on every layer so
+DOM order cannot matter — lens 0, veil 1, grain 2, content 3.
+
+### Measured, before and after
+
+Full sweep, 238 text elements across 3 engines x 2 schemes x 2 scenes, contrast
+computed from composited pixels:
+
+| Pass | Failures below WCAG |
+| --- | --- |
+| As first shipped | **124 / 238 (52%)** |
+| After raising tint and flattening the ink ramp | 83 / 238 (35%) |
+| After the veil fix | **1 marginal (4.37 vs 4.5)** |
+
+The middle row is the instructive one: a whole pass of plausible token tuning
+bought 41 fixes and left the cause untouched. Several values did not move at all,
+which is the signature of treating a structural bug as a parameter.
+
+Spot check after the veil fix, worst-case backdrops, SDF engine:
+
+| Scene / theme / backdrop | body | caption | title | button | table | badge |
+| --- | --- | --- | --- | --- | --- | --- |
+| hero / dark / photo | 8.54 | 8.94 | 12.23 | 18.24 | — | — |
+| hero / light / minimal | 10.99 | 10.83 | 17.49 | 16.83 | — | — |
+| dashboard / dark / saturated | — | 10.48 | 9.98 | 8.49 | 10.63 | 8.59 |
+| dashboard / light / black&white | — | 8.86 | 11.82 | 6.38 | 13.99 | 7.51 |
+
+With the tint composited correctly, alpha could come back DOWN — .88 to .60 dark,
+.90 to .68 light — so the material is visibly glass again while body copy holds
+8-11:1. The legibility and the look were never actually in tension; a layering bug
+was making them look like they were.
+
+### The process failure, which matters more than the bug
+
+I built the pixel-level contrast gate for the bake-off and then shipped a whole
+component library and gallery **without running it against them**. The defect was
+found by a human looking at a screenshot. A gate that exists but is not wired into
+the thing being changed is worth approximately nothing, so `a11y-contrast.spec.ts`
+now covers the gallery and must run before any visual claim about it.

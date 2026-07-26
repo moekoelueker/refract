@@ -25,20 +25,29 @@
    the panel does not glow like a lightbox.
    ═══════════════════════════════════════════════════════════════════════════ */
 [data-rf-scheme="dark"] {
-  --rf-tint: var(--rf-n-0);
-  --rf-tint-a: .52;          /* was .16 and measurably illegible */
+  /* FINDING 017: the tint must be the SAME POLARITY AS THE SCHEME. Apple's dark
+     nav is rgba(22,22,23,.8) — a near-black tint. Using a white tint on a dark
+     scheme and then raising its alpha for legibility does the exact opposite: the
+     surface goes pale while --rf-fg stays white, so a chrome bar at .74 becomes
+     near-white with white text on it. Raising alpha only helps if the tint is
+     moving the surface AWAY from the foreground. */
+  --rf-tint: var(--rf-n-950);
+  --rf-tint-a: .60;
   --rf-border-a: .26;
   --rf-rim-top: .42;
   --rf-rim-bottom: .10;
   --rf-rim-inner-glow: .05;
 
   --rf-fg: var(--rf-n-0);
-  --rf-fg-dim: oklch(99.2% .003 264 / .74);
-  --rf-fg-faint: oklch(99.2% .003 264 / .54);
+  /* MEASURED: at .74/.54 over a translucent material, captions and eyebrows land
+     at 1.7-3.5 against a 4.5 requirement. Hierarchy on glass has to come from
+     size and weight, not from fading the ink. */
+  --rf-fg-dim: oklch(99.2% .003 264 / .86);
+  --rf-fg-faint: oklch(99.2% .003 264 / .70);
 
   /* the plate: a scrim under body copy only. Text never sits on raw material. */
-  --rf-plate-a: .14;
-  --rf-plate: oklch(12.5% .006 264);
+  --rf-plate-a: .18;
+  --rf-plate: oklch(9% .005 264);
 
   --rf-shadow-c: .03;
   --rf-grain: .042;
@@ -51,17 +60,17 @@
 
 [data-rf-scheme="light"] {
   --rf-tint: var(--rf-n-0);
-  --rf-tint-a: .70;
+  --rf-tint-a: .68;
   --rf-border-a: .52;
   --rf-rim-top: .90;
   --rf-rim-bottom: .05;
   --rf-rim-inner-glow: .34;
 
-  --rf-fg: oklch(21% .014 264);
-  --rf-fg-dim: oklch(21% .014 264 / .74);
-  --rf-fg-faint: oklch(21% .014 264 / .54);
+  --rf-fg: oklch(19% .014 264);
+  --rf-fg-dim: oklch(19% .014 264 / .84);
+  --rf-fg-faint: oklch(19% .014 264 / .68);
 
-  --rf-plate-a: .30;
+  --rf-plate-a: .26;
   --rf-plate: oklch(99.5% .002 264);
 
   --rf-shadow-c: .020;
@@ -157,7 +166,7 @@
 /* chrome: nav bars and toolbars. Legibility-critical, so the most opaque, and
    Apple's own nav is 0.8 for exactly this reason. */
 [data-rf-role="chrome"] {
-  --rf-tint-a: .74;
+  --rf-tint-a: .72;
   --rf-radius: var(--rf-r-9);
   --rf-pad: 10px;
   --rf-band: 18px;
@@ -165,7 +174,7 @@
   --rf-plate-a: 0;
 }
 [data-rf-scheme="light"][data-rf-role="chrome"],
-[data-rf-scheme="light"] [data-rf-role="chrome"] { --rf-tint-a: .82; }
+[data-rf-scheme="light"] [data-rf-role="chrome"] { --rf-tint-a: .78; }
 
 /* content: the primary reading surface. Where contrast is decided. */
 [data-rf-role="content"] {
@@ -176,7 +185,7 @@
 /* overlay: dialogs, sheets, menus. Sits above a scrim, so it can be thicker
    and carries the highest elevation. */
 [data-rf-role="overlay"] {
-  --rf-tint-a: .80;
+  --rf-tint-a: .82;
   --rf-radius: var(--rf-r-12);
   --rf-pad: 22px;
   --rf-band: 24px;
