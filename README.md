@@ -1,3 +1,23 @@
+> # This project continued as OpenGlass UI
+>
+> Refract was the first research pass at cross-browser glass. The work carried
+> on in **[OpenGlass UI](https://github.com/moekoelueker/open-glass-ui)**, which
+> is published, documented, and open to contributions:
+>
+> ```sh
+> npm install open-glass-ui
+> ```
+>
+> This repository is archived and read only. Its research notes under `docs/`
+> stay available as a record of how the approach was reached, in particular the
+> `feDisplacementMap` technique for refracting a declared copy of the backdrop
+> across all three engines, and the prior-art survey that found no library
+> implementing `prefers-reduced-transparency` or `prefers-contrast`.
+>
+> Open issues and pull requests on the new repository instead.
+
+---
+
 # Refract
 
 **Glass components for React that actually refract. Chrome, Safari and Firefox, no flags.**
