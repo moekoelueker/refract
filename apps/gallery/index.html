@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en" data-rf-scheme="dark" data-rf-accent="neutral" data-rf-preset="hybrid">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Refract gallery — three engines, one component library</title>
+<link rel="stylesheet" href="../../packages/core/tokens.css">
+<link rel="stylesheet" href="../../packages/core/approaches.css">
+<link rel="stylesheet" href="../../packages/ui/presets.css">
+<link rel="stylesheet" href="../../packages/ui/ui.css">
+<link rel="stylesheet" href="./lib/gallery.css">
+<body>
+<div id="app"><div class="boot">
+  <h1>Refract gallery</h1>
+  <p id="boot-msg">Loading the component library&hellip;</p>
+  <pre id="boot-err" hidden></pre>
+  <p class="g-hint">If this notice stays, the page script did not run. The reason is printed above.</p>
+</div></div>
+<script src="./lib/bundle.js"></script>
+<script>
+  (function () {
+    var msg = document.getElementById('boot-msg'), err = document.getElementById('boot-err');
+    function fail(w) { if (!msg) return; msg.textContent = 'This page could not start.'; err.hidden = false; err.textContent = w; }
+    window.addEventListener('error', function (e) {
+      fail((e.message || 'script error') + (e.filename ? '\n' + e.filename + ':' + e.lineno : ''));
+    });
+    if (typeof window.mountGallery !== 'function') {
+      return fail('lib/bundle.js did not load or did not finish.\nLocation: ' + location.href +
+                  '\nRun "npm run bundle" if lib/bundle.js is missing.');
+    }
+    try { window.mountGallery(); } catch (e) { fail(String((e && e.stack) || e)); }
+  })();
+</script>
+</body>
+</html>

@@ -345,3 +345,76 @@ Two fixes, and the second matters more than the first:
 
 Verified afterwards: 5 pages x 3 engines x {file://, http://} = 30/30 mount with
 8 glass surfaces each.
+
+---
+
+## 2026-07-25 — Cross-checked against a parallel implementation (prism-lab)
+
+Compared against `~/Desktop/personal-projects/prism-lab`: a pnpm monorepo, 4
+packages, 40 components, 5 experiments, 246 checked-in screenshots, 65 passing
+unit tests. Audited by reading its source and by probing its built showcase in a
+browser. It is a genuinely strong piece of work and it is stronger than this repo
+in several specific ways worth stealing.
+
+### What it does better, and should be copied
+
+- **Property-based tests on the optics core** (`fast-check`, 100 runs): SDF sign
+  per shape, axis symmetry to 8 decimals, unit-length normals to 6 decimals,
+  monotonicity of displacement in thickness, byte-identical determinism. 65 tests
+  in 1.26s. This repo has zero unit tests and should not.
+- **Capability detection that separates `backdropFilter` from
+  `backdropUrlSyntax`** and documents why inferring one from the other is wrong.
+  Independently the same conclusion as FINDING 008 here.
+- **SSR-safe by construction**, verified with `renderToString` plus a real Next 16
+  app-router fixture. Pointer motion never touches React state, with a test
+  asserting `renders === 1` after a pointer move.
+- **Production-grade WebGL lifecycle**: `requestVideoFrameCallback`, hidden-document
+  draw suppression, context-loss `preventDefault()` + resource re-creation,
+  idempotent dispose, six lenses batched into one draw call.
+- **`EngineAnnotation` overlays** that explain the mechanism inside the specimen.
+  The best reviewer-facing idea in either repo.
+- Six backdrop environments rendered simultaneously, including a real 960×540
+  H.264 video with documented provenance.
+
+### The finding that decided the comparison
+
+**Its SVG displacement is applied to a decorative `aria-hidden` `<span>` filled
+with `repeating-linear-gradient`, not to page content.** The SDF chain displaces a
+synthetic measurement grid. Separately, `selectRenderer()` is advisory only:
+`Glass` writes `data-prism-renderer="sdf-svg"` and then applies the CSS material
+regardless, so an element labelled as the SVG renderer is visually pure CSS. Four
+of its e2e tests assert on those attributes and therefore verify nothing about
+rendering, and there is no pixel comparison anywhere in the repo.
+
+Two consequences worth generalising:
+
+1. **An attribute is not evidence.** `data-*` telemetry that describes intent is
+   indistinguishable, to a test and to a reviewer in DevTools, from telemetry that
+   describes output. The rim-delta assertion in this repo exists precisely because
+   nothing else can tell those apart.
+2. **A decorative filter target hides misalignment.** Its `<feImage>` has no
+   `x`/`y` while the filter region is `-18% / 136%`, so the map is stretched across
+   a 136% box against a 100% source. Over a repeating grid that is invisible. Over
+   content it would not be.
+
+Also: it never sets `primitiveUnits`, so it inherits `objectBoundingBox`-relative
+behaviour — the exact configuration measured here as differing by 3.0px between
+Firefox and the other two engines.
+
+### FINDING 015 — `createElement('svg')` silently produces nothing
+
+`document.createElement('svg')` returns an `HTMLUnknownElement`, not an
+`SVGElement`. Every icon in the new component library was an invisible empty box,
+and nothing threw. Parsing the markup through a `<template>` puts it in HTML
+foreign-content mode and gets the namespace right without hand-writing
+`createElementNS` per node.
+
+Caught by looking at a screenshot, not by a test — which is an argument for
+keeping a human in the visual loop even with gates in place.
+
+### FINDING 016 — a glob inside a block comment closed it
+
+The generated bundle header contained `apps/*/lib`. The `*/` terminated the
+comment, and the rest of the header parsed as code, producing
+`SyntaxError: Unexpected token 'with'` from prose. Both bundles were dead. Worth
+remembering when generating comments programmatically.

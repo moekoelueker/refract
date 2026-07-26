@@ -1,0 +1,325 @@
+/**
+ * Per-engine, per-theme material presets — the "best settings" layer.
+ *
+ * The optimal material is NOT the same across engines, and shipping one set of
+ * numbers for all of them is why comparisons usually look unfair:
+ *
+ *   sdf     displacement is baked into a raster map, so a slightly wider band
+ *           reads better (the map quantises the falloff) and the frost lives
+ *           inside the filter, where it can be generous without extra cost.
+ *   webgl   evaluated per pixel, so the falloff can be tighter and dispersion
+ *           higher before it bands. The 16-tap frost is the expensive part, so
+ *           blur stays moderate and the rim does more of the work.
+ *   hybrid  routes by role: hero surfaces get real optics, controls get CSS.
+ *           Its numbers are the CSS tier's, plus overrides for hero roles.
+ *
+ * THE CONTRAST CORRECTION. The bake-off measured 5 of 8 backdrops failing WCAG
+ * 4.5 at a dark tint alpha of 0.16. Apple ships 0.80. These presets raise the
+ * floor and add a content plate behind body copy, which is the part that
+ * actually has to be legible. Verified by measurement, not by eye.
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   DARK
+   Cool-neutral surface, white rim at reduced alpha plus an outer dark line so
+   the panel does not glow like a lightbox.
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-rf-scheme="dark"] {
+  --rf-tint: var(--rf-n-0);
+  --rf-tint-a: .52;          /* was .16 and measurably illegible */
+  --rf-border-a: .26;
+  --rf-rim-top: .42;
+  --rf-rim-bottom: .10;
+  --rf-rim-inner-glow: .05;
+
+  --rf-fg: var(--rf-n-0);
+  --rf-fg-dim: oklch(99.2% .003 264 / .74);
+  --rf-fg-faint: oklch(99.2% .003 264 / .54);
+
+  /* the plate: a scrim under body copy only. Text never sits on raw material. */
+  --rf-plate-a: .14;
+  --rf-plate: oklch(12.5% .006 264);
+
+  --rf-shadow-c: .03;
+  --rf-grain: .042;
+
+  /* semantic, and deliberately restrained: these are status, not decoration */
+  --rf-ok: oklch(76% .124 158);
+  --rf-warn: oklch(80% .118 76);
+  --rf-danger: oklch(70% .152 24);
+}
+
+[data-rf-scheme="light"] {
+  --rf-tint: var(--rf-n-0);
+  --rf-tint-a: .70;
+  --rf-border-a: .52;
+  --rf-rim-top: .90;
+  --rf-rim-bottom: .05;
+  --rf-rim-inner-glow: .34;
+
+  --rf-fg: oklch(21% .014 264);
+  --rf-fg-dim: oklch(21% .014 264 / .74);
+  --rf-fg-faint: oklch(21% .014 264 / .54);
+
+  --rf-plate-a: .30;
+  --rf-plate: oklch(99.5% .002 264);
+
+  --rf-shadow-c: .020;
+  --rf-shadow-hue: 258;
+  --rf-grain: .026;
+
+  --rf-ok: oklch(52% .118 158);
+  --rf-warn: oklch(58% .112 74);
+  --rf-danger: oklch(53% .162 26);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ENGINE PRESETS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── SDF: SVG feDisplacementMap on a declared clone ─────────────────────────
+   Wider band because a 256² map quantises a tight falloff into visible steps.
+   Generous frost because it is one feGaussianBlur inside a filter we already
+   pay for. Moderate dispersion: three passes is the cost, and past ~0.6 the
+   fringe starts reading as a rendering error rather than as glass. */
+[data-rf-preset="sdf"] {
+  --rf-band: 30px;
+  --rf-depth: 24px;
+  --rf-curvature: 3.0;
+  --rf-ior: 1.46;
+  --rf-chroma: .52;
+  --rf-specular: .50;
+  --rf-specular-power: 16;
+  --rf-specular-angle: 145deg;
+  --rf-blur: 18px;
+  --rf-profile: squircle;     /* flatter dome keeps more interior perfectly flat */
+}
+[data-rf-preset="sdf"][data-rf-scheme="light"] {
+  /* light backdrops brighten through the clone-plus-filter path more than the
+     others, so pull chroma and specular back or the rim reads as a smear */
+  --rf-chroma: .38;
+  --rf-specular: .34;
+  --rf-depth: 20px;
+  --rf-blur: 20px;
+}
+
+/* ── WebGL2: per-pixel Snell with true per-channel IOR ─────────────────────
+   Tighter band and higher dispersion, because nothing is quantised. The rim
+   carries more of the look, so specular runs hotter and sharper. */
+[data-rf-preset="webgl"] {
+  --rf-band: 22px;
+  --rf-depth: 26px;
+  --rf-curvature: 3.6;
+  --rf-ior: 1.50;
+  --rf-chroma: .72;
+  --rf-specular: .60;
+  --rf-specular-power: 24;
+  --rf-specular-angle: 142deg;
+  --rf-blur: 14px;
+  --rf-profile: convex;
+}
+[data-rf-preset="webgl"][data-rf-scheme="light"] {
+  --rf-chroma: .48;
+  --rf-specular: .40;
+  --rf-blur: 16px;
+}
+
+/* ── Hybrid: capability and role routing ───────────────────────────────────
+   The floor is the CSS tier, which is what most surfaces get. Hero roles are
+   promoted to real optics by the policy in engine.js, and inherit the sdf or
+   webgl numbers above. What is tuned HERE is the CSS tier, because it is what
+   you actually see most of. */
+[data-rf-preset="hybrid"] {
+  --rf-band: 26px;
+  --rf-depth: 20px;
+  --rf-curvature: 3.2;
+  --rf-ior: 1.45;
+  --rf-chroma: .45;
+  --rf-specular: .52;
+  --rf-specular-power: 18;
+  --rf-specular-angle: 145deg;
+  --rf-blur: 20px;
+  --rf-profile: squircle;
+}
+[data-rf-preset="hybrid"][data-rf-scheme="light"] {
+  --rf-chroma: .34;
+  --rf-specular: .36;
+  --rf-blur: 22px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ROLES
+   A material is not one thing. A nav bar, a body card, a floating overlay and a
+   28px control want different numbers, and using one set for all of them is the
+   difference between a system and a screenshot.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* chrome: nav bars and toolbars. Legibility-critical, so the most opaque, and
+   Apple's own nav is 0.8 for exactly this reason. */
+[data-rf-role="chrome"] {
+  --rf-tint-a: .74;
+  --rf-radius: var(--rf-r-9);
+  --rf-pad: 10px;
+  --rf-band: 18px;
+  --rf-depth: 14px;
+  --rf-plate-a: 0;
+}
+[data-rf-scheme="light"][data-rf-role="chrome"],
+[data-rf-scheme="light"] [data-rf-role="chrome"] { --rf-tint-a: .82; }
+
+/* content: the primary reading surface. Where contrast is decided. */
+[data-rf-role="content"] {
+  --rf-radius: var(--rf-r-11);
+  --rf-pad: 26px;
+}
+
+/* overlay: dialogs, sheets, menus. Sits above a scrim, so it can be thicker
+   and carries the highest elevation. */
+[data-rf-role="overlay"] {
+  --rf-tint-a: .80;
+  --rf-radius: var(--rf-r-12);
+  --rf-pad: 22px;
+  --rf-band: 24px;
+  --rf-depth: 22px;
+  --rf-plate-a: 0;
+}
+[data-rf-scheme="light"] [data-rf-role="overlay"] { --rf-tint-a: .88; }
+
+/* control: small geometry. A 26px band on a 32px control is all rim and no
+   glass, so the band and depth scale down hard. */
+[data-rf-role="control"] {
+  --rf-radius: var(--rf-r-6);
+  --rf-pad: 0px;
+  --rf-band: 8px;
+  --rf-depth: 7px;
+  --rf-chroma: .28;
+  --rf-plate-a: 0;
+}
+
+/* accent: the one surface allowed chroma, for a single hero moment per screen */
+[data-rf-role="accent"] {
+  --rf-tint: oklch(from var(--rf-accent) l c h);
+  --rf-tint-a: .34;
+  --rf-specular: .70;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ACCESSIBILITY — at the token level, so no component needs to know.
+   Reduce transparency means FROSTIER, not more transparent: raise alpha AND
+   blur. Lowering alpha is the most common implementation of this and it is
+   backwards.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-transparency: reduce) {
+  :root { --rf-glassiness: .10; --rf-blur: 30px; --rf-chroma: 0; --rf-specular: .18; }
+}
+[data-rf-transparency="reduce"] {
+  --rf-glassiness: .10; --rf-blur: 30px; --rf-chroma: 0; --rf-specular: .18;
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --rf-glassiness: .14; --rf-border-a: .80; --rf-chroma: 0; --rf-specular: .12;
+    --rf-fg-dim: var(--rf-fg); --rf-fg-faint: var(--rf-fg);
+    --rf-plate-a: .55;
+  }
+}
+[data-rf-contrast="more"] {
+  --rf-glassiness: .14; --rf-border-a: .80; --rf-chroma: 0; --rf-specular: .12;
+  --rf-fg-dim: var(--rf-fg); --rf-fg-faint: var(--rf-fg);
+  --rf-plate-a: .55;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ACCENT SYSTEM
+   Set `data-rf-accent` on <html>. Default is NEUTRAL, and that is deliberate.
+
+   The failure mode to avoid is a high-chroma accent at high lightness — that is
+   what reads as "neon" and it dates a design instantly. Every accent below is
+   held at chroma 0.11–0.16 and lightness 0.55–0.72, which is the band where a
+   hue stays confident without shouting. Hue is the only thing that changes
+   between them, so they are genuinely interchangeable and none of them will
+   fight the dispersion in the glass rim.
+
+   Rule that survives every option: the accent appears ONLY on focus, selection,
+   and the single primary action per surface. Never on decoration.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── NEUTRAL (default) ──────────────────────────────────────────────────────
+   No hue at all. Emphasis comes from luminance and weight, which is how the
+   most expensive interfaces do it: a primary button is simply the highest
+   contrast object on screen. Light-on-dark and dark-on-light. */
+:root,
+[data-rf-accent="neutral"] {
+  --rf-accent: oklch(97% .002 264);
+  --rf-accent-dim: oklch(88% .004 264);
+  --rf-accent-ink: oklch(14% .006 264);      /* text ON the accent */
+  --rf-focus: oklch(97% .002 264);
+  --rf-accent-soft: oklch(97% .002 264 / .14);
+}
+/* Co-located only, never as a descendant pair. A derived token resolves where it
+   is declared (FINDING 009), so `[data-rf-scheme="light"] [data-rf-accent]`
+   would inherit an accent already resolved against the dark scheme. The gallery
+   therefore always sets scheme and accent on the same element. */
+[data-rf-accent="neutral"][data-rf-scheme="light"] {
+  --rf-accent: oklch(22% .010 264);
+  --rf-accent-dim: oklch(34% .012 264);
+  --rf-accent-ink: oklch(99% .002 264);
+  --rf-focus: oklch(22% .010 264);
+  --rf-accent-soft: oklch(22% .010 264 / .12);
+}
+
+/* ── COPPER — warm, editorial, reads as considered rather than corporate ──── */
+[data-rf-accent="copper"] {
+  --rf-accent: oklch(70% .134 52);
+  --rf-accent-dim: oklch(62% .128 50);
+  --rf-accent-ink: oklch(16% .030 52);
+  --rf-focus: oklch(74% .120 55);
+  --rf-accent-soft: oklch(70% .134 52 / .18);
+}
+
+/* ── JADE — calm and premium, deliberately not the usual product teal ─────── */
+[data-rf-accent="jade"] {
+  --rf-accent: oklch(63% .112 172);
+  --rf-accent-dim: oklch(55% .106 173);
+  --rf-accent-ink: oklch(98% .010 172);
+  --rf-focus: oklch(70% .102 172);
+  --rf-accent-soft: oklch(63% .112 172 / .18);
+}
+
+/* ── INK — the safe institutional choice, deepened so it is not Bootstrap ─── */
+[data-rf-accent="ink"] {
+  --rf-accent: oklch(54% .148 268);
+  --rf-accent-dim: oklch(46% .142 270);
+  --rf-accent-ink: oklch(99% .004 268);
+  --rf-focus: oklch(64% .140 266);
+  --rf-accent-soft: oklch(54% .148 268 / .20);
+}
+
+/* ── MULBERRY — distinctive without being loud; good on both schemes ──────── */
+[data-rf-accent="mulberry"] {
+  --rf-accent: oklch(58% .152 338);
+  --rf-accent-dim: oklch(50% .146 339);
+  --rf-accent-ink: oklch(99% .006 338);
+  --rf-focus: oklch(68% .140 337);
+  --rf-accent-soft: oklch(58% .152 338 / .20);
+}
+
+/* ── BONE — near-neutral warm. The most expensive-looking option on dark. ─── */
+[data-rf-accent="bone"] {
+  --rf-accent: oklch(88% .036 84);
+  --rf-accent-dim: oklch(79% .040 82);
+  --rf-accent-ink: oklch(18% .020 84);
+  --rf-focus: oklch(90% .030 84);
+  --rf-accent-soft: oklch(88% .036 84 / .16);
+}
+
+/* A deliberate counter-example, kept so the difference is arguable rather than
+   asserted. This is the chroma/lightness combination that reads as neon, and it
+   is what the comparison build used. Not a recommendation. */
+[data-rf-accent="lime"] {
+  --rf-accent: oklch(86% .196 128);
+  --rf-accent-dim: oklch(78% .190 128);
+  --rf-accent-ink: oklch(18% .050 128);
+  --rf-focus: oklch(86% .196 128);
+  --rf-accent-soft: oklch(86% .196 128 / .20);
+}
